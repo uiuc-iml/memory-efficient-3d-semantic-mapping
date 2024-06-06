@@ -15,7 +15,7 @@ from PIL import Image
 from src.build_model import build_model
 from src.models.model import Upsample
 from src.prepare_data import prepare_data
-from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation
+from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation, MaskFormerFeatureExtractor, MaskFormerForInstanceSegmentation
 
 
 class ESANetClassifier:
@@ -406,3 +406,84 @@ class FineTunedTSegmenter():
             else:
                 pred = F.interpolate(logits, (x,y),mode='nearest')
         return pred.squeeze().detach().permute((1,2,0)).contiguous().cpu().numpy()
+
+
+
+class MaskformerSegmenter():
+    def __init__(self,temperature = 1,model_ckpt = "facebook/maskformer-swin-small-ade"):
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.feature_extractor = MaskFormerFeatureExtractor.from_pretrained("facebook/maskformer-swin-small-ade")
+        self.model = MaskFormerForInstanceSegmentation.from_pretrained(model_ckpt).to(self.device)
+        self.model.eval()
+        self.temperature = temperature
+        
+        self.softmax = nn.Softmax(dim = -1)
+
+    def get_raw_logits(self,rgb,depth = None,x=None,y = None,temperature = 1):
+        with torch.no_grad():
+            image = Image.fromarray(np.uint8(rgb))
+            inputs = self.feature_extractor(images=image, return_tensors="pt")
+            # print(inputs['pixel_values'].shape)
+            outputs = self.model(**inputs.to(self.device))
+            class_queries_logits = outputs.class_queries_logits     # probability vector for each query (batch_size, num_queries, num_classes+1)
+            print(f"shape of class_queries_logits: {class_queries_logits.shape}")
+            masks_queries_logits = outputs.masks_queries_logits     # logits for each pixel that represent the prob of lying in a query (batch, num_queries, height, width)
+            print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
+            predicted_query_indices = torch.argmax(masks_queries_logits, dim=1) # query for each pixel (batch, height, width)
+            print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
+            batch_size, num_queries, height, width = masks_queries_logits.shape
+            num_classes_plus_one = class_queries_logits.size(-1)
+            pixel_query_vectors = torch.zeros((batch_size, height, width, num_classes_plus_one))  # logits for each pixel (batch, height, width, num_classes+1)
+            for m in range(batch_size):
+              for i in range(height):
+                for j in range(width):
+                  pixel_query_vectors[m, i, j] = class_queries_logits[m, predicted_query_indices[m, i, j]]
+
+            pred_t = pixel_query_vectors.permute(0,3,1,2)
+
+            if((x == None) or( y == None)):
+                pred_t = F.interpolate(pred_t, (image.height,image.width),mode='nearest')
+            else:
+                pred_t = F.interpolate(pred_t, (x,y),mode='nearest')
+              
+            print(f"shape of pred_t: {pred_t.shape}")
+            pred = pred_t.permute(0,2,3,1)
+        return pred.squeeze().detach().contiguous().cpu().numpy()
+      
+    def get_pred_probs(self,rgb,depth = None,x = None,y = None,temperature = None):
+      with torch.no_grad():
+            image = Image.fromarray(np.uint8(rgb))
+            inputs = self.feature_extractor(images=image, return_tensors="pt")
+            # print(inputs['pixel_values'].shape)
+            outputs = self.model(**inputs.to(self.device))
+            class_queries_logits = outputs.class_queries_logits     # probability vector for each query (batch_size, num_queries, num_classes+1)
+            print(f"shape of class_queries_logits: {class_queries_logits.shape}")
+            masks_queries_logits = outputs.masks_queries_logits     # logits for each pixel that represent the prob of lying in a query (batch, num_queries, height, width)
+            print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
+            predicted_query_indices = torch.argmax(masks_queries_logits, dim=1) # query for each pixel (batch, height, width)
+            print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
+            batch_size, num_queries, height, width = masks_queries_logits.shape
+            num_classes_plus_one = class_queries_logits.size(-1)
+            pixel_query_vectors = torch.zeros((batch_size, height, width, num_classes_plus_one))  # logits for each pixel (batch, height, width, num_classes+1)
+            for m in range(batch_size):
+              for i in range(height):
+                for j in range(width):
+                  pixel_query_vectors[m, i, j] = class_queries_logits[m, predicted_query_indices[m, i, j]]
+
+            pred_t = pixel_query_vectors.permute(0,3,1,2)
+
+            if((x == None) or( y == None)):
+                pred_t = F.interpolate(pred_t, (image.height,image.width),mode='nearest')
+            else:
+                pred_t = F.interpolate(pred_t, (x,y),mode='nearest')
+              
+            print(f"shape of pred_t: {pred_t.shape}")
+            pred = pred_t.permute(0,2,3,1)
+            pred = self.softmax(pred)      
+      return pred.squeeze().detach().contiguous().cpu().numpy()
+
+    def classify(self,rgb,depth = None,x=None,y = None,temperature = None):
+      with torch.no_grad():
+        probs = self.get_pred_probs(rgb,depth,x,y,temperature)
+        probs = np.argmax(probs,axis = 2)
+      return probs
