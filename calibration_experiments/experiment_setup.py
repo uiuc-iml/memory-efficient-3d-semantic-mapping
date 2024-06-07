@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
 from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration
-from utils.segmentation_model_loader import ESANetClassifier, TSegmenter,FineTunedTSegmenter,FineTunedESANet
+from utils.segmentation_model_loader import ESANetClassifier, TSegmenter,FineTunedTSegmenter,FineTunedESANet, MaskformerSegmenter
 
 
 class Experiment_Generator:
@@ -33,7 +33,7 @@ class Experiment_Generator:
         oracle = experiment.get('oracle',False)
         L = experiment.get('L',0)
         epsilon = experiment.get('epsilon',1)
-        segmentation = experiment.get('segmentation','Segformer')
+        segmentation = experiment.get('segmentation','Maskformer')
         learned = experiment.get('learned_params',None)
         self.process_id = process_id
         gpu_to_use = self.process_id%torch.cuda.device_count()
@@ -81,9 +81,11 @@ class Experiment_Generator:
         return rec
 
     def get_model(self,segmentation,experiment,calibration):
-        assert segmentation in ['Segformer','ESANet'],"Segmentation Model {} is not yet a valid choice"
+        assert segmentation in ['Segformer','ESANet', 'Maskformer'],"Segmentation Model {} is not yet a valid choice"
         if(segmentation == 'Segformer'):
             model = FineTunedTSegmenter()
+        elif(segmentation == 'Maskformer'):
+            model = MaskformerSegmenter()
         elif(segmentation == 'ESANet'):
             model = FineTunedESANet()
         else:
