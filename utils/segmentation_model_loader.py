@@ -433,12 +433,8 @@ class MaskformerSegmenter():
             print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
             batch_size, num_queries, height, width = masks_queries_logits.shape
             num_classes_plus_one = class_queries_logits.size(-1)
-            pixel_query_vectors = torch.zeros((batch_size, height, width, num_classes_plus_one))  # logits for each pixel (batch, height, width, num_classes+1)
-            for m in range(batch_size):
-              for i in range(height):
-                for j in range(width):
-                  pixel_query_vectors[m, i, j] = class_queries_logits[m, predicted_query_indices[m, i, j]]
-
+            batch_indices = torch.arange(batch_size).unsqueeze(-1).unsqueeze(-1)
+            pixel_query_vectors = class_queries_logits[batch_indices, predicted_query_indices]
             pred_t = pixel_query_vectors.permute(0,3,1,2)
 
             if((x == None) or( y == None)):
@@ -464,12 +460,8 @@ class MaskformerSegmenter():
             print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
             batch_size, num_queries, height, width = masks_queries_logits.shape
             num_classes_plus_one = class_queries_logits.size(-1)
-            pixel_query_vectors = torch.zeros((batch_size, height, width, num_classes_plus_one))  # logits for each pixel (batch, height, width, num_classes+1)
-            for m in range(batch_size):
-              for i in range(height):
-                for j in range(width):
-                  pixel_query_vectors[m, i, j] = class_queries_logits[m, predicted_query_indices[m, i, j]]
-
+            batch_indices = torch.arange(batch_size).unsqueeze(-1).unsqueeze(-1)
+            pixel_query_vectors = class_queries_logits[batch_indices, predicted_query_indices]
             pred_t = pixel_query_vectors.permute(0,3,1,2)
 
             if((x == None) or( y == None)):
