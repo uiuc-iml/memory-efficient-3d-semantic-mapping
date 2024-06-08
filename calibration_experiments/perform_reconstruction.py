@@ -33,7 +33,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "2" # export NUMEXPR_NUM_THREADS=6
 
 
 from experiment_setup import Experiment_Generator
-from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes
+from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes
 from utils.sens_reader import scannet_scene_reader
 
 processes = 2
@@ -164,12 +164,14 @@ def main():
         import multiprocessing
         debug = args.debug
         oracle = experiment_settings['oracle']
-        val_scenes,test_scenes = get_larger_test_and_validation_scenes()
-        selected_scenes = sorted(test_scenes)
+        # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+        # selected_scenes = sorted(test_scenes)
+        test_scenes1 = get_smaller_test_scenes()
+        selected_scenes1 = sorted(test_scenes1)
         p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
 
         res = []
-        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle),selected_scenes,chunksize = 1), total= len(selected_scenes),position = 0,desc = 'tot_scenes'):
+        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle),selected_scenes1,chunksize = 1), total= len(selected_scenes1),position = 0,desc = 'tot_scenes'):
                 res.append(a)
 
         torch.cuda.empty_cache()

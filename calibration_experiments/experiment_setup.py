@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
 from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration
-from utils.segmentation_model_loader import ESANetClassifier, TSegmenter,FineTunedTSegmenter,FineTunedESANet, MaskformerSegmenter
+from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter
 
 
 class Experiment_Generator:
