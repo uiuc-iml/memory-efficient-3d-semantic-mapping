@@ -426,11 +426,11 @@ class MaskformerSegmenter():
             # print(inputs['pixel_values'].shape)
             outputs = self.model(**inputs.to(self.device))
             class_queries_logits = outputs.class_queries_logits     # probability vector for each query (batch_size, num_queries, num_classes+1)
-            print(f"shape of class_queries_logits: {class_queries_logits.shape}")
+            # print(f"shape of class_queries_logits: {class_queries_logits.shape}")
             masks_queries_logits = outputs.masks_queries_logits     # logits for each pixel that represent the prob of lying in a query (batch, num_queries, height, width)
-            print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
+            # print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
             predicted_query_indices = torch.argmax(masks_queries_logits, dim=1) # query for each pixel (batch, height, width)
-            print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
+            # print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
             batch_size, num_queries, height, width = masks_queries_logits.shape
             num_classes_plus_one = class_queries_logits.size(-1)
             batch_indices = torch.arange(batch_size).unsqueeze(-1).unsqueeze(-1)
@@ -442,7 +442,7 @@ class MaskformerSegmenter():
             else:
                 pred_t = F.interpolate(pred_t, (x,y),mode='nearest')
               
-            print(f"shape of pred_t: {pred_t.shape}")
+            # print(f"shape of pred_t: {pred_t.shape}")
             pred = pred_t.permute(0,2,3,1)
         return pred.squeeze().detach().contiguous().cpu().numpy()
       
@@ -453,11 +453,11 @@ class MaskformerSegmenter():
             # print(inputs['pixel_values'].shape)
             outputs = self.model(**inputs.to(self.device))
             class_queries_logits = outputs.class_queries_logits     # probability vector for each query (batch_size, num_queries, num_classes+1)
-            print(f"shape of class_queries_logits: {class_queries_logits.shape}")
+            # print(f"shape of class_queries_logits: {class_queries_logits.shape}")
             masks_queries_logits = outputs.masks_queries_logits     # logits for each pixel that represent the prob of lying in a query (batch, num_queries, height, width)
-            print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
+            # print(f"size of masks_queries_logits:{masks_queries_logits.shape}")
             predicted_query_indices = torch.argmax(masks_queries_logits, dim=1) # query for each pixel (batch, height, width)
-            print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
+            # print(f"size of predicted_query_indices: {predicted_query_indices.shape}")
             batch_size, num_queries, height, width = masks_queries_logits.shape
             num_classes_plus_one = class_queries_logits.size(-1)
             batch_indices = torch.arange(batch_size).unsqueeze(-1).unsqueeze(-1)
@@ -469,9 +469,14 @@ class MaskformerSegmenter():
             else:
                 pred_t = F.interpolate(pred_t, (x,y),mode='nearest')
               
-            print(f"shape of pred_t: {pred_t.shape}")
+            # print(f"shape of pred_t: {pred_t.shape}")
             pred = pred_t.permute(0,2,3,1)
-            pred = self.softmax(pred)      
+            if(temperature):
+                # print('applying temperature scaling')
+                pred = self.softmax(pred/temperature)
+            else:
+                pred = self.softmax(pred/self.temperature)
+            # pred = self.softmax(pred)      
       return pred.squeeze().detach().contiguous().cpu().numpy()
 
     def classify(self,rgb,depth = None,x=None,y = None,temperature = None):

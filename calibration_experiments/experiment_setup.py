@@ -17,11 +17,11 @@ from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, Mask
 
 
 class Experiment_Generator:
-    def __init__(self):
+    def __init__(self,n_labels = 21):
         self.voxel_size = 0.025 #3.0 / 512
         self.trunc =self.voxel_size * 8
         self.res = 8
-        self.n_labels = 21
+        self.n_labels = n_labels
         self.depth_scale = 1000.0
         self.depth_max = 5.0
         self.miu = 0.001

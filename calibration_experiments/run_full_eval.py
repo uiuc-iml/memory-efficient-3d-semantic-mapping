@@ -20,7 +20,7 @@ from utils.my_calibration import (
 )
 from utils.ScanNet_scene_definitions import (
     get_classes,
-    get_larger_test_and_validation_scenes,get_filenames
+    get_larger_test_and_validation_scenes,get_filenames, get_small_test_scenes2
 
 )
 
@@ -41,7 +41,8 @@ def compute_mIoUs():
     experiments,short_names = get_experiments_and_short_names()
     
     
-    val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    test_scenes = get_small_test_scenes2()
 
     selected_scenes = test_scenes
 

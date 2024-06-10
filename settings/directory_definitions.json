@@ -1,6 +1,6 @@
 {
-"results_dir":"Home/semanticmapping/results",
-"ScanNet_root_dir":"Home/Data/scannet_v2",
+"results_dir":"/home/motion/semanticmapping/results",
+"ScanNet_root_dir":"/home/motion/Data/scannet_v2",
 "finetune_dir":"",
 "h5py_dataset_dir":"",
 "singleton_dataset_dir":"",

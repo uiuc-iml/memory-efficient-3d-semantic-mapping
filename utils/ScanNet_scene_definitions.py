@@ -31,6 +31,10 @@ def get_smaller_test_scenes():
        'scene0651_02', 'scene0030_01', 'scene0593_01',
        'scene0685_00', 'scene0645_00'])
 
+def get_small_test_scenes2():
+    return sorted(['scene0518_00', 'scene0658_00', 'scene0607_01', 'scene0574_02', 'scene0553_02', 'scene0427_00'])
+
+
 def get_learned_calibration_validation_scenes():
     return sorted(['scene0025_00', 'scene0648_00', 'scene0256_00', 'scene0207_00',
        'scene0203_01', 'scene0406_01', 'scene0651_00', 'scene0355_00',

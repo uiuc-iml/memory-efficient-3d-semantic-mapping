@@ -33,15 +33,15 @@ os.environ["NUMEXPR_NUM_THREADS"] = "2" # export NUMEXPR_NUM_THREADS=6
 
 
 from experiment_setup import Experiment_Generator
-from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes
+from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes, get_small_test_scenes2
 from utils.sens_reader import scannet_scene_reader
 
-processes = 2
+processes = 1
 
 def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
 
 
-    EG = Experiment_Generator()
+    EG = Experiment_Generator(n_labels = 151)
     fnames = get_filenames()
     rec,model = EG.get_reconstruction_and_model(experiment = experiment_settings,process_id = multiprocessing.current_process()._identity[0])
     if(experiment_settings['integration'] == 'Generalized'):
@@ -166,7 +166,7 @@ def main():
         oracle = experiment_settings['oracle']
         # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
         # selected_scenes = sorted(test_scenes)
-        test_scenes1 = get_smaller_test_scenes()
+        test_scenes1 = get_small_test_scenes2()
         selected_scenes1 = sorted(test_scenes1)
         p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
 
