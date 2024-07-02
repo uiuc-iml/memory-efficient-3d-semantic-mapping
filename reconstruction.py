@@ -15,6 +15,19 @@ from utils.rendering_utils import render_depth_and_normals,get_camera_rays
 import torch.utils.dlpack
 from torch import linalg as LA
 import torch.nn as nn
+import os
+import nvidia_smi
+
+
+
+
+gpu_memory_usage = []
+
+def get_gpu_memory_usage():
+    nvidia_smi.nvmlInit()
+    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+    info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+    return (info.used/(1024 ** 3))
 
 
 def get_properties(voxel_grid,points,attribute,res = 8,voxel_size = 0.025,device = o3d.core.Device('CUDA:0')):
@@ -264,6 +277,15 @@ class Reconstruction:
     def update_semantics(self,semantic_label,v_proj,u_proj,valid_voxel_indices,mask_inlier,weight):
         # performing semantic integration
         #  Laplace Smoothing of the observation
+        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
+        # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/cacherelease'
+        # plot_dir = os.path.join(des, "Maskformer Geometric Mean")
+        # arr_dir = os.path.join(arr_des, "Maskformer Geometric Mean")
+        # if not os.path.exists(plot_dir):
+        #     os.makedirs(plot_dir)
+        # if not os.path.exists(arr_dir):
+        #     os.makedirs(arr_dir)
+
         semantic_label += self.miu
         renormalizer = 1+self.miu*self.n_labels
         semantic_label = semantic_label/renormalizer
@@ -280,6 +302,12 @@ class Reconstruction:
         #Bayesian update in log space    
         semantic[valid_voxel_indices] = semantic[valid_voxel_indices]+semantic_readings[mask_inlier]
         o3d.core.cuda.synchronize()
+        # gpu_memory_usage.append(get_gpu_memory_usage())
+        # gpu_memory_usage_np = np.array(gpu_memory_usage)
+        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+
+        o3d.core.cuda.release_cache()
+
 
     def extract_point_cloud(self,return_raw_logits = False):
 
@@ -421,6 +449,16 @@ class ProbabilisticAveragedReconstruction(Reconstruction):
 
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
 
+        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
+        # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/cacherelease'
+        # plot_dir = os.path.join(des, "Maskformer Naive Averaging")
+        # arr_dir = os.path.join(arr_des, "Maskformer Naive Averaging")
+        # if not os.path.exists(plot_dir):
+        #     os.makedirs(plot_dir)
+        # if not os.path.exists(arr_dir):
+        #     os.makedirs(arr_dir)
+
+
 
         semantic_label = semantic_label
 
@@ -439,6 +477,11 @@ class ProbabilisticAveragedReconstruction(Reconstruction):
         semantic[valid_voxel_indices] = (semantic_weight[valid_voxel_indices].reshape((-1,1))*semantic[valid_voxel_indices]+semantic_readings[mask_inlier])/(semantic_weight[valid_voxel_indices].reshape((-1,1))+1)
         semantic_weight[valid_voxel_indices] += 1
         o3d.core.cuda.synchronize()
+        # gpu_memory_usage.append(get_gpu_memory_usage())
+        # gpu_memory_usage_np = np.array(gpu_memory_usage)
+        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+
+        o3d.core.cuda.release_cache()
 
 
 
@@ -485,6 +528,355 @@ class ProbabilisticAveragedReconstruction(Reconstruction):
 
 
 class HistogramReconstruction(GroundTruthGenerator):
+    
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+
+        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
+        # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/cacherelease'
+        # plot_dir = os.path.join(des, "Maskformer Histogram")
+        # arr_dir = os.path.join(arr_des, "Maskformer Histogram")
+        # if not os.path.exists(plot_dir):
+        #     os.makedirs(plot_dir)
+        # if not os.path.exists(arr_dir):
+        #     os.makedirs(arr_dir)
+
+        semantic_label = np.argmax(semantic_label,axis = 2)
+        
+        # semantic_label = torch.nn.functional.one_hot(torch.from_numpy(semantic_label.astype(np.int64)),num_classes = self.n_labels).numpy().astype(np.float32)
+    #  Laplace Smoothing #1
+        semantic_image =  o3d.t.geometry.Image(semantic_label).to(self.device)
+        
+                
+        semantic_readings = semantic_image.as_tensor()[v_proj,
+                                                u_proj].to(o3c.int64)
+        
+        # pdb.set_trace()
+        semantic = self.vbg.attribute('label').reshape((-1, self.n_labels))
+        # initializing previously unobserved voxels with uniform prior
+
+        # updating the histogram
+        semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
+        o3d.core.cuda.synchronize()
+
+        o3d.core.cuda.release_cache()
+        # gpu_memory_usage.append(get_gpu_memory_usage())
+        # gpu_memory_usage_np = np.array(gpu_memory_usage)
+        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+
+
+
+
+
+class topkhist(Reconstruction):
+    def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,k1=4):
+        self.k = k1
+        super().__init__(depth_scale,depth_max,res,voxel_size,trunc_multiplier,n_labels,integrate_color,device,miu)
+        
+    
+    def initialize_vbg(self):
+        if(self.integrate_color and (self.n_labels is None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'color'),
+            (o3c.float32, o3c.float32, o3c.float32), ((1), (1), (3)),
+            self.voxel_size,self.res, 30000, self.device)
+        elif((self.integrate_color == False) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.int64), ((1), (1), (((self.k)*2)+1)),
+            self.voxel_size,self.res, 30000, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2)+1, 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+
+
+        elif((self.integrate_color) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight','color','topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.float32,o3c.int64), ((1), (1),(3),((((self.k)*2)+1))),
+            self.voxel_size,self.res, 30000, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2)+1, 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+        else:
+            print('No color or Semantics')
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight'),
+            (o3c.float32, o3c.float32), ((1), (1)),
+            self.voxel_size,self.res, 30000, self.device)
+
+
+    
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+
+
+
+
+
+
+        semantic_label = np.argmax(semantic_label,axis = 2)
+        semantic_image =  o3d.t.geometry.Image(semantic_label).to(self.device)
+        k = self.k
+                
+        semantic_readings = semantic_image.as_tensor()[v_proj,
+                                                u_proj].to(o3c.int64)
+        # pdb.set_trace()
+        topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, ((self.k)*2)+1))
+        topsemanticlabel = semantic_readings[mask_inlier].flatten()
+        topk[valid_voxel_indices, 2*(self.k)] += 1
+        
+
+
+        matches = [np.zeros(valid_voxel_indices.shape, dtype=bool) for _ in range(self.k)]
+
+        # matches stores the masks for voxel_indices that had label from the top-k labels  this iteration
+        for i in range(self.k):
+            if i == 0:
+                matches[i] = (topk[valid_voxel_indices, 0] == topsemanticlabel).cpu().numpy()
+            else:
+                matches[i] = (topk[valid_voxel_indices, 2*i] == topsemanticlabel).cpu().numpy() & ~np.any(matches[:i], axis=0)
+
+        # increment the count of top-k label matches
+        for i in range(self.k):
+            topk[valid_voxel_indices[matches[i]], 2 * i + 1] += 1
+
+        # making sure that the top-k attribute is sorted after count increments
+        for i in range(1,self.k):
+            adjust_mask = topk[valid_voxel_indices[matches[i]], 2*i+1] > topk[valid_voxel_indices[matches[i]], 2*(i-1) + 1]
+            topk[valid_voxel_indices[matches[i]][adjust_mask], [[2*i], [2*i+1], [2*(i-1)], [2*(i-1)+1]]] = topk[valid_voxel_indices[matches[i]][adjust_mask], [[2*(i-1)], [2*(i-1)+1], [2*i], [2*i+1]]] 
+
+
+
+        # Handle non-matches (voxel_indixes where the obsereved class was not already in the top-k labels)
+
+        no_match = ~np.any(matches,axis=0)
+        no_match_indices = valid_voxel_indices[no_match]
+        no_match_labels = topsemanticlabel[no_match]
+
+        # Find the top most empty slot to add a new label to the top-k attribute
+        empty_slots = [((topk[no_match_indices, 2 * i] == -1).cpu().numpy()) & (~np.any([((topk[no_match_indices, 2 * j] == -1).cpu().numpy()) for j in range(i)], axis=0)) for i in range(self.k)]
+
+        # Fill empty slots with new labels
+
+        for i in range(self.k):
+            topk[no_match_indices[empty_slots[i]], 2 * i] = no_match_labels[empty_slots[i]]
+            topk[no_match_indices[empty_slots[i]], 2 * i + 1] = 1
+
+        # Handle fully occupied voxel_indices which had no matches to top-k and no empty slots
+        fully_occupied = ~np.any(empty_slots, axis=0)
+        fully_occupied_indices = no_match_indices[fully_occupied]
+
+
+        #decrement the count of the top-k label with the least count and remove it if count reaches 0
+        if len(fully_occupied_indices) > 0:
+            topk[fully_occupied_indices, 2*k-1] -= 1
+            remove_indices =  topk[fully_occupied_indices, 2*k-1] <= 0
+            topk[fully_occupied_indices[remove_indices], 2*k-2] = -1
+
+
+        
+
+        # semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
+        
+        o3d.core.cuda.synchronize()
+        # gpu_memory_usage.append(get_gpu_memory_usage())
+        # gpu_memory_usage_np = np.array(gpu_memory_usage)
+        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+        # print("here")
+
+        o3d.core.cuda.release_cache()
+        
+
+    def extract_point_cloud(self,return_raw_logits = False):
+
+        """Returns the current (colored) point cloud and the current probability estimate for each of the points, if performing metric-semantic reconstruction
+
+        Returns:
+            open3d.cpu.pybind.t.geometry.PointCloud, np.array(N_points,n_labels) (or None)
+        """
+        pcd = self.vbg.extract_point_cloud()
+        pcd = pcd.to_legacy()
+        target_points = np.asarray(pcd.points)
+        if(self.semantic_integration):
+            topk,coords = get_properties(self.vbg,target_points,'topkclassesandfreq',res = self.res,voxel_size = self.voxel_size,device = self.device)
+            if topk is not None:
+                a = np.zeros((topk.shape[0], self.n_labels)).astype(float)  # Shape: (num_points, 151)
+            
+                class_indices = np.arange(0, 2 * self.k, 2)  # Shape: (self.k,)
+                count_indices = np.arange(1, 2 * self.k, 2)  # Shape: (self.k,)
+            
+                # Flatten and filter out invalid entries
+                valid_class_indices = (topk[:, class_indices]).cpu().numpy().flatten()  # Shape: (num_points * self.k,)
+                valid_class_counts = (topk[:, count_indices].cpu().numpy()).flatten()  # Shape: (num_points * self.k,)
+                valid_mask = valid_class_indices != -1  # Shape: (num_points * self.k,)
+            
+                valid_class_indices = valid_class_indices[valid_mask]  # Shape: (num_valid_entries,)
+                valid_class_counts = valid_class_counts[valid_mask]  # Shape: (num_valid_entries,)
+            
+                # Compute sum of counts for normalization
+                sums = (topk[:, count_indices]).cpu().numpy().sum(axis=1, keepdims=True)  
+            
+                # Populate the probability array
+                a[np.repeat(np.arange(topk.shape[0]), self.k)[valid_mask], valid_class_indices] = valid_class_counts  
+            
+                # Normalize if sums are greater than 0
+                valid_sums_mask = sums.flatten() > 0  # Shape: (num_points,)
+                a[valid_sums_mask] /= sums[valid_sums_mask]
+
+                # combine with uniform distribution using alpha
+                
+                total_counts = (topk[:,-1]).cpu().numpy()
+                alphas = np.zeros_like(total_counts, dtype=np.float64)
+                valid_mask = total_counts != 0
+                alphas[valid_mask] = (sums.flatten())[valid_mask] / total_counts[valid_mask]
+                # print(f'topk:{topk[345:450]}')
+                # print(f'total_counts:{total_counts[345:450]}')
+                # print(f'alphas:{alphas[345:450]}')
+                # print(f'sums:{sums.flatten()[345:450]}')
+                # alphas = sums.flatten()/total_counts
+                uniform_dist = np.full_like(a,(self.n_labels)/(self.n_labels))
+                a = ((a.T * alphas) + (uniform_dist.T * (1-alphas))).T
+                # print(a[3:5])
+            
+                if return_raw_logits:
+                    return pcd, a.astype(np.float64)
+                else:
+                    return pcd, a.astype(np.float64)
+            else:
+                return None, None
+        else:
+            return pcd, None
+
+    
+
+
+
+
+
+
+
+
+
+class GroundTruthGenerator16(Reconstruction):
+    def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001):
+        super().__init__(depth_scale,depth_max,res,voxel_size,trunc_multiplier,n_labels,integrate_color,device,miu)
+
+    def initialize_vbg(self):
+        if(self.integrate_color and (self.n_labels is None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'color'),
+            (o3c.float32, o3c.float32, o3c.float32), ((1), (1), (3)),
+            self.voxel_size,self.res, 30000, self.device)
+        elif((self.integrate_color == False) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'label'),
+            (o3c.float32, o3c.float32, o3c.uint16), ((1), (1), (self.n_labels)),
+            self.voxel_size,self.res, 30000, self.device)
+        elif((self.integrate_color) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight','color','label'),
+            (o3c.float32, o3c.float32, o3c.float32,o3c.uint16), ((1), (1),(3),(self.n_labels)),
+            self.voxel_size,self.res, 30000, self.device)
+        else:
+            print('No color or Semantics')
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight'),
+            (o3c.float32, o3c.float32), ((1), (1)),
+            self.voxel_size,self.res, 30000, self.device)
+
+    def update_semantics(self,semantic_label,v_proj,u_proj,valid_voxel_indices,mask_inlier,weight):
+        "takes in the GT mask resized to the depth image size"
+        # now performing semantic integration
+        # semantic_label = cv2.resize(data_dict['semantic_label'],(depth.columns,depth.rows),interpolation= cv2.INTER_NEAREST)
+        # semantic_label = model.classify(data_dict['color'],data_dict['depth'])
+        # cv2.resize(semantic_label,(depth.columns,depth.rows),interpolation= cv2.INTER_NEAREST)
+        # print(np.max(semantic_label),np.min(semantic_label))
+        # one-hot encoding semantic label
+        semantic_label = torch.nn.functional.one_hot(torch.from_numpy(semantic_label.astype(np.int64)),num_classes = self.n_labels).numpy().astype(np.float32)
+        #  Laplace Smoothing #1
+        color = o3d.t.geometry.Image(semantic_label).to(self.device)
+        
+        color_readings = color.as_tensor()[v_proj,
+                                        u_proj].to(o3c.float32)
+        color = self.vbg.attribute('label').reshape((-1, self.n_labels))
+        # Detection Count update
+        color[valid_voxel_indices]  = color[valid_voxel_indices]+color_readings[mask_inlier]
+    def extract_triangle_mesh(self,return_raw_logits = False):
+        """Returns the current (colored) mesh and the current probability for each class estimate for each of the vertices, if performing metric-semantic reconstruction
+
+        Returns:
+            open3d.cpu.pybind.geometry.TriangleMesh, np.array(N_vertices,n_labels) (or None)
+        """
+        mesh = self.vbg.extract_triangle_mesh()
+        mesh = mesh.to_legacy()
+        if(self.semantic_integration):
+            target_points = np.asarray(mesh.vertices)
+            labels,coords = get_properties(self.vbg,target_points,'label',res = self.res,voxel_size = self.voxel_size,device = self.device)
+            labels = labels.cpu().numpy().astype(np.float64)
+            #getting the correct probabilities
+            if(return_raw_logits):
+                vertex_labels = labels
+            else:
+                vertex_labels = labels/labels.sum(axis=1,keepdims = True)
+            return mesh,vertex_labels
+        else:
+            return mesh,None
+    def extract_point_cloud(self,return_raw_logits = False):
+
+        """Returns the current (colored) point cloud and the current probability estimate for each of the points, if performing metric-semantic reconstruction
+
+        Returns:
+            open3d.cpu.pybind.t.geometry.PointCloud, np.array(N_points,n_labels) (or None)
+        """
+        pcd = self.vbg.extract_point_cloud()
+        pcd = pcd.to_legacy()
+        target_points = np.asarray(pcd.points)
+        if(self.semantic_integration):
+            labels,coords = get_properties(self.vbg,target_points,'label',res = self.res,voxel_size = self.voxel_size,device = self.device)
+            if labels is not None:
+                labels = labels.cpu().numpy().astype(np.float64)
+                labels[labels.sum(axis =1)==0] = 1/21.0
+
+                # pdb.set_trace()
+                if(return_raw_logits):
+                    labels = labels
+                else:
+                    labels = labels/labels.sum(axis=1,keepdims = True)
+                return pcd,labels
+            else:
+                return None,None
+        else:
+            return pcd,None
+
+
+
+class HistogramReconstruction16(GroundTruthGenerator16):
+    def initialize_vbg(self):
+        if(self.integrate_color and (self.n_labels is None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'color'),
+            (o3c.float32, o3c.float32, o3c.float32), ((1), (1), (3)),
+            self.voxel_size,self.res, 30000, self.device)
+        elif((self.integrate_color == False) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'label'),
+            (o3c.float32, o3c.float32, o3c.uint16), ((1), (1), (self.n_labels)),
+            self.voxel_size,self.res, 30000, self.device)
+        elif((self.integrate_color) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight','color','label'),
+            (o3c.float32, o3c.float32, o3c.float32,o3c.uint16), ((1), (1),(3),(self.n_labels)),
+            self.voxel_size,self.res, 30000, self.device)
+        else:
+            print('No color or Semantics')
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight'),
+            (o3c.float32, o3c.float32), ((1), (1)),
+            self.voxel_size,self.res, 30000, self.device)
+
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
         semantic_label = np.argmax(semantic_label,axis = 2)
         # semantic_label = torch.nn.functional.one_hot(torch.from_numpy(semantic_label.astype(np.int64)),num_classes = self.n_labels).numpy().astype(np.float32)
@@ -501,6 +893,7 @@ class HistogramReconstruction(GroundTruthGenerator):
         semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
         
         o3d.core.cuda.synchronize()
+        o3d.core.cuda.release_cache()
 
 class GeometricBayes(Reconstruction):
     def extract_point_cloud(self,return_raw_logits = False):

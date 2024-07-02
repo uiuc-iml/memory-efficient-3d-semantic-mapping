@@ -1,5 +1,5 @@
 {
-"results_dir":"/home/motion/semanticmapping/results",
+"results_dir":"/home/motion/semanticmapping/resultdump2",
 "ScanNet_root_dir":"/home/motion/Data/scannet_v2",
 "finetune_dir":"",
 "h5py_dataset_dir":"",

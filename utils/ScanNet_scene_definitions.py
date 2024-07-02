@@ -32,7 +32,7 @@ def get_smaller_test_scenes():
        'scene0685_00', 'scene0645_00'])
 
 def get_small_test_scenes2():
-    return sorted(['scene0518_00', 'scene0658_00', 'scene0607_01', 'scene0574_02', 'scene0553_02', 'scene0427_00'])
+    return sorted(['scene0427_00'])
 
 
 def get_learned_calibration_validation_scenes():
@@ -97,10 +97,14 @@ def get_fixed_train_and_val_splits():
                     'scene0704_01']
     
 
-    val_scans = ['scene0025_00', 'scene0025_02', 'scene0046_01', 'scene0222_00', 'scene0222_01', 'scene0300_00',
-                'scene0412_00', 'scene0412_01', 'scene0474_01', 'scene0474_02', 'scene0474_05', 'scene0549_00',
-                'scene0559_02', 'scene0595_00', 'scene0599_02', 'scene0653_01', 'scene0664_01', 'scene0671_00',
-                'scene0671_01', 'scene0684_00', 'scene0700_01']
+    # val_scans = ['scene0025_00', 'scene0025_02', 'scene0046_01', 'scene0222_00', 'scene0222_01', 'scene0300_00',
+    #             'scene0412_00', 'scene0412_01', 'scene0474_01', 'scene0474_02', 'scene0474_05', 'scene0549_00',
+    #             'scene0559_02', 'scene0595_00', 'scene0599_02', 'scene0653_01', 'scene0664_01', 'scene0671_00',
+    #             'scene0671_01', 'scene0684_00', 'scene0700_01']
+
+    val_scans = ['scene0025_00', 'scene0046_01', 'scene0222_00', 'scene0300_00',
+                'scene0474_05', 'scene0549_00',
+                'scene0559_02', 'scene0653_01', 'scene0664_01', 'scene0700_01']
 
     return train_scans,val_scans
 

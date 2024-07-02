@@ -1,12 +1,8 @@
 {"experiments":[
-"Maskformer Naive Bayesian",
-"Maskformer Geometric Mean",
-"Maskformer Histogram",
-"Maskformer Naive Averaging"
+
+"Maskformer topk"
 ],
-"short_names":["Maskformer Naive Bayesian",
-"Maskformer Geometric Mean",
-"Maskformer Histogram",
-"Maskformer Naive Averaging"
+"short_names":[
+"Maskformer topk"
 ]
 }

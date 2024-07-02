@@ -12,12 +12,12 @@ sys.path.append(parent_dir)
 
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
-from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration
+from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist
 from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter
 
 
 class Experiment_Generator:
-    def __init__(self,n_labels = 21):
+    def __init__(self,n_labels = 151):
         self.voxel_size = 0.025 #3.0 / 512
         self.trunc =self.voxel_size * 8
         self.res = 8
@@ -40,13 +40,17 @@ class Experiment_Generator:
         self.o3d_device = 'CUDA:{}'.format(gpu_to_use)
         self.torch_device = 'cuda:{}'.format(gpu_to_use)
 
+        k = experiment.get('k',None)
+        rec = self.get_reconstruction(calibration,integration,segmentation,oracle,epsilon,L,learned,k)
 
-        rec = self.get_reconstruction(calibration,integration,segmentation,oracle,epsilon,L,learned)
+
+
+        # rec = self.get_reconstruction(calibration,integration,segmentation,oracle,epsilon,L,learned)
         model = self.get_model(segmentation,experiment,calibration)
         return rec,model
     
-    def get_reconstruction(self,calibration,integration,segmentation,oracle,epsilon,L,learned):
-        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized'],"Integration choice {} is not yet a valid choice".format(integration)
+    def get_reconstruction(self,calibration,integration,segmentation,oracle,epsilon,L,learned,k2):
+        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized', 'topk'],"Integration choice {} is not yet a valid choice".format(integration)
         assert calibration in ['None','2D Temperature Scaling','3D Temperature Scaling','2D Vector Scaling','3D Vector Scaling','VEDE','Informed VEDE','Learned'],"Calibration choice {} is not yet a valid choice".format(calibration)
         if(learned is not None):
             temperature_file = learned['temperature']
@@ -64,6 +68,9 @@ class Experiment_Generator:
         elif(integration == 'Geometric Mean'):
             rec = GeometricBayes(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
+        elif(integration == 'topk'):
+            rec = topkhist(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+            device = o3d.core.Device(self.o3d_device),miu =self.miu,k1 = k2)
         elif(integration == 'Generalized'):
             if(calibration == 'None'):
                 rec = GeneralizedIntegration(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
