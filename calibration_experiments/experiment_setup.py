@@ -12,12 +12,13 @@ sys.path.append(parent_dir)
 
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
-from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist
+from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction
 from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter
+from utils.clipfeatures import ClipFeatureExtractor
 
 
 class Experiment_Generator:
-    def __init__(self,n_labels = 151):
+    def __init__(self,n_labels = 21):
         self.voxel_size = 0.025 #3.0 / 512
         self.trunc =self.voxel_size * 8
         self.res = 8
@@ -33,13 +34,13 @@ class Experiment_Generator:
         oracle = experiment.get('oracle',False)
         L = experiment.get('L',0)
         epsilon = experiment.get('epsilon',1)
-        segmentation = experiment.get('segmentation','Maskformer')
+        segmentation = experiment.get('segmentation','Segformer')
         learned = experiment.get('learned_params',None)
         self.process_id = process_id
         gpu_to_use = self.process_id%torch.cuda.device_count()
         self.o3d_device = 'CUDA:{}'.format(gpu_to_use)
         self.torch_device = 'cuda:{}'.format(gpu_to_use)
-
+        
         k = experiment.get('k',None)
         rec = self.get_reconstruction(calibration,integration,segmentation,oracle,epsilon,L,learned,k)
 
@@ -50,7 +51,7 @@ class Experiment_Generator:
         return rec,model
     
     def get_reconstruction(self,calibration,integration,segmentation,oracle,epsilon,L,learned,k2):
-        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized', 'topk'],"Integration choice {} is not yet a valid choice".format(integration)
+        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized', 'topk', 'Encoded Averaging'],"Integration choice {} is not yet a valid choice".format(integration)
         assert calibration in ['None','2D Temperature Scaling','3D Temperature Scaling','2D Vector Scaling','3D Vector Scaling','VEDE','Informed VEDE','Learned'],"Calibration choice {} is not yet a valid choice".format(calibration)
         if(learned is not None):
             temperature_file = learned['temperature']
@@ -62,8 +63,11 @@ class Experiment_Generator:
         elif(integration in ['Averaging','Naive Averaging']):
             rec = ProbabilisticAveragedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
+        elif(integration == 'Encoded Averaging'):
+            rec = ProbabilisticAveragedEncodedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+            device = o3d.core.Device(self.o3d_device),miu =self.miu)
         elif(integration == 'Histogram'):
-            rec = HistogramReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+            rec = HistogramReconstruction16(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
         elif(integration == 'Geometric Mean'):
             rec = GeometricBayes(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
@@ -88,13 +92,15 @@ class Experiment_Generator:
         return rec
 
     def get_model(self,segmentation,experiment,calibration):
-        assert segmentation in ['Segformer','ESANet', 'Maskformer'],"Segmentation Model {} is not yet a valid choice"
+        assert segmentation in ['Segformer','ESANet', 'Maskformer', 'CLIP'],"Segmentation Model {} is not yet a valid choice"
         if(segmentation == 'Segformer'):
             model = FineTunedTSegmenter()
         elif(segmentation == 'Maskformer'):
             model = MaskformerSegmenter()
         elif(segmentation == 'ESANet'):
             model = FineTunedESANet()
+        elif(segmentation == "CLIP"):
+            model = ClipFeatureExtractor()
         else:
             raise ValueError("Selected model {} is not a valid selection".format(segmentation))
         if((calibration != 'None') and (calibration != 'Learned')):

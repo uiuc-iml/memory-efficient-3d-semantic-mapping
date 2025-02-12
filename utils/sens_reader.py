@@ -12,6 +12,16 @@ import shutil
 from tqdm import tqdm
 import zipfile
 import pandas as pd
+from torch.utils.data import Dataset
+from glob import glob
+import json
+import yaml
+import klampt
+from klampt.math import se3
+from klampt.math import so3
+
+
+
 
 
 
@@ -27,6 +37,81 @@ def unzip(zip_path, zip_type,scene_name):
             zip_ref.extractall(target_dir)
     return os.path.join(target_dir, zip_type)
 
+
+class ScanNetPPReader(Dataset):
+    def __init__(self,root_dir,scene_name):
+        self.scene = scene_name
+        self.root_dir = root_dir
+        self.parent_dir = root_dir+'/data/{}/iphone'.format(scene_name)
+        self.depth_image_files = sorted(glob(self.parent_dir+'/depth/*.png'))
+        self.rgb_image_files =  sorted(glob(self.parent_dir+'/rgb/*.jpg'))
+        with open(self.parent_dir + '/pose_intrinsic_imu.json','r') as f:
+            self.poses_dict = json.load(f)
+        self.poses_key = list(self.poses_dict.keys())
+        self.size = len(self.depth_image_files)
+        
+    def __getitem__(self,key):
+        depth_dir = self.depth_image_files[key]
+        rgb_dir = self.rgb_image_files[key]
+        pose_key = self.poses_key[key]
+        depth = cv2.imread(depth_dir,cv2.IMREAD_UNCHANGED)
+        rgb = cv2.imread(rgb_dir,cv2.IMREAD_UNCHANGED)
+        rgb = cv2.resize(rgb,(0,0),fx = 1/7.5,fy = 1/7.5)
+        aligned_pose = np.array(self.poses_dict[pose_key]['aligned_pose'])
+        intrinsic = np.array(self.poses_dict[pose_key]['intrinsic'])
+        intrinsic[:2,:3] = intrinsic[:2,:3]/7.5
+        return {
+            'color': rgb,
+            'depth': depth,
+            'pose': aligned_pose,
+            'intrinsics_depth':intrinsic
+        }
+
+    def __len__(self):
+        return self.size
+
+class BS3D_reader(Dataset):
+    def __init__(self,root_dir):
+        self.depth_dir = root_dir + '/campus_depth_cam_depth_render/depth_render/'
+        self.color_dir = root_dir + '/campus_depth_cam_color/color/'
+        self.poses_dir = root_dir + '/campus_depth_cam_poses/poses.txt'
+        self.calibration_dir = root_dir + '/campus_depth_cam_calibration/calibration.yaml'
+        with open(self.calibration_dir,'r') as stream:
+            tmp = yaml.safe_load(stream)
+            if tmp:
+                print(tmp)
+            else:
+                print("raise")
+        # with open(self.calibration_dir,'r') as stream:
+        #     tmp = yaml.safe_load(stream)
+        self.intrinsic = np.array(tmp['camera_matrix']['data']).reshape(3,3)
+        self.poses = pd.read_csv(self.poses_dir,sep = ' ',header = None)
+
+    def __len__(self):
+        return self.poses.shape[0]
+        
+    def __getitem__(self,idx):
+        time_stamp = self.poses.iloc[idx,0]
+        t = self.poses.iloc[idx,1:4].values
+        q = self.poses.iloc[idx,4:].values
+        q[[0,1,2,3]] = q[[3,0,1,2]]
+        R = so3.ndarray(so3.from_quaternion(q))
+        pose = np.eye(4)
+        pose[:3,:3] = R
+        pose[:3,3] = t
+        depth_file = self.depth_dir + '{:.6f}.png'.format(time_stamp)
+        color_file = self.color_dir + '{:.6f}.jpg'.format(time_stamp)
+
+        depth = cv2.imread(depth_file,cv2.IMREAD_UNCHANGED)
+        rgb = cv2.imread(color_file,cv2.IMREAD_UNCHANGED)
+        rgb = cv2.resize(rgb,(0,0),fx = 1/2,fy = 1/2)
+
+        return {
+            'color': rgb,
+            'depth': depth,
+            'pose': pose,
+            'intrinsics_depth':self.intrinsic
+        }
 
 
 
@@ -203,7 +288,7 @@ class scannet_scene_reader:
 
 
 if __name__ == '__main__':
-    from utils.ScanNet_scene_definitions import get_filenames
+    from ScanNet_scene_definitions import get_filenames
 
     fnames = get_filenames()
     root_dir = fnames['ScanNet_root_dir']
@@ -214,9 +299,9 @@ if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
 
-    plt.imshow(data_dict['semantic_label'] == 21)
+    # plt.imshow(data_dict['semantic_label'] == 21)
 
-    # plt.imshow(data_dict['color'])
+    plt.imshow(data_dict['color'])
 
 
     plt.show()

@@ -8,7 +8,8 @@ SEED = 0
 
 def get_larger_test_and_validation_scenes():
     
-    df = pd.read_csv('./scenes_and_contents_20_classes.csv')
+    # df = pd.read_csv('./scenes_and_contents_20_classes.csv')
+    df = pd.read_csv('scenes_and_contents_20_classes.csv')
     np.random.seed(0)
     series = df.scene
     scenes = sorted(np.random.choice(sorted(series.to_numpy().tolist()),size = 100,replace = False))    
@@ -16,6 +17,27 @@ def get_larger_test_and_validation_scenes():
     new_test_scenes = sorted(np.random.choice(sorted(testable_scenes.to_numpy().tolist()),size = 100,replace = False))
 
     return scenes,new_test_scenes
+
+def get_scannetpp_test_scenes():
+    file_path = 'newtest.txt'
+    with open(file_path, 'r') as file:
+        scenes = [line.strip() for line in file]
+    
+    # return sorted(['c5f701a8c7', 'c856c41c99', 'cf1ffd871d', 'd6cbe4b28b', 'd7abfc4b17', 'd918af9c5f', 'e0de253456', 'e7ac609391', 'e8ea9b4da8', 
+    #                 'eb4bc76767', 'ef69d58016', 'f248c2bcdc', 'fd361ab85f'])
+    # return sorted(['a08d9a2476', 'c0f5742640',  'bb87c292ad','e7ac609391', 'fd361ab85f', 'ef69d58016', '8133208cb6', 'd7abfc4b17'])
+    # return sorted(['280b83fcf3'])
+    print(sorted(scenes[0:10]))
+    return sorted(scenes[0:10])
+    
+def get_scannetpp_train_scenes():
+    file_path = 'newtrain.txt'
+    with open(file_path, 'r') as file:
+        scenes = [line.strip() for line in file]
+    
+    # return sorted(['c5f701a8c7', 'c856c41c99', 'cf1ffd871d', 'd6cbe4b28b', 'd7abfc4b17', 'd918af9c5f', 'e0de253456', 'e7ac609391', 'e8ea9b4da8', 
+    #                 'eb4bc76767', 'ef69d58016', 'f248c2bcdc', 'fd361ab85f'])
+    return sorted(scenes)
 
 def get_smaller_balanced_validation_scenes():
     return sorted(['scene0412_01','scene0025_02','scene0700_01','scene0046_01','scene0203_00','scene0697_01',
@@ -32,8 +54,16 @@ def get_smaller_test_scenes():
        'scene0685_00', 'scene0645_00'])
 
 def get_small_test_scenes2():
-    return sorted(['scene0427_00'])
+    # return sorted(['scene0427_00', 'scene0343_00', 'scene0389_00', 'scene0406_02', 'scene0474_03', 'scene0488_00', 'scene0593_00', 'scene0664_01', 'scene0686_00', 'scene0695_01'])
+# def get_small_test_scenes2():
+    return sorted(['scene0427_00', 'scene0343_00'])
 
+def h5pyscenes():
+    return sorted(['scene0427_00', 'scene0343_00', 'scene0389_00', 'scene0406_02', 'scene0474_03', 'scene0488_00', 'scene0593_00', 'scene0664_01', 'scene0686_00', 'scene0695_01',
+        'scene0568_00','scene0700_02','scene0699_00', 'scene0025_00', 'scene0648_00', 'scene0256_00', 'scene0207_00', 'scene0203_01', 'scene0651_00', 'scene0355_00',
+        'scene0697_00','scene0518_00', 'scene0146_01', 'scene0651_02', 'scene0030_01', 'scene0685_00', 'scene0645_00', 'scene0193_00', 'scene0278_01', 'scene0304_00', 
+        'scene0316_00', 'scene0329_02', 'scene0334_01', 'scene0342_00','scene0356_02', 'scene0357_01', 'scene0377_01', 'scene0378_00', 'scene0527_00', 'scene0500_01',
+        'scene0441_00', 'scene0435_00', 'scene0430_00', 'scene0426_03', 'scene0414_00', 'scene0575_02', 'scene0598_01', 'scene0644_00', 'scene0660_00', 'scene0704_01'])
 
 def get_learned_calibration_validation_scenes():
     return sorted(['scene0025_00', 'scene0648_00', 'scene0256_00', 'scene0207_00',
@@ -50,6 +80,13 @@ def get_COLORS():
 def get_classes():
     classes = ['irrelevant','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
            'counter','desk','curtain','refrigerator','shower curtain','toilet','sink','bathtub','otherfurniture']
+    return classes
+
+def get_scannetpp_classes():
+    classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
+        'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
+        'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
+        'radiator', 'glass', 'clock', 'flag']
     return classes
 
 

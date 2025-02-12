@@ -9,6 +9,7 @@ import open3d as o3d
 import torch
 from torchmetrics.functional import jaccard_index
 from tqdm.notebook import tqdm
+import gc
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -20,13 +21,19 @@ from utils.my_calibration import (
 )
 from utils.ScanNet_scene_definitions import (
     get_classes,
+    get_scannetpp_classes,
     get_larger_test_and_validation_scenes,
-    get_filenames, get_small_test_scenes2
+    get_filenames, get_small_test_scenes2,
+    get_scannetpp_test_scenes
 
 )
 
+from utils.scannetpp_utils import (
+    scanentpp_gt_getter
+)
+
 evaluation_start = 0
-no_void =  True
+no_void =  False
 fnames = get_filenames()
 
 results_dir = fnames['results_dir']
@@ -42,11 +49,12 @@ def compute_mIoUs():
     experiments,short_names = get_experiments_and_short_names()
     
     
-    val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
     # test_scenes = get_larger_test_and_validation_scenes()
+    test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
     pcds_template = '{}/{}/{}/*.pcd'
     labels_template = '{}/{}/{}/labels*.p'
     per_exp_IoUs = {}
@@ -58,18 +66,26 @@ def compute_mIoUs():
         totals = []
         for scene in tqdm(selected_scenes,desc = '{} mIoUs'.format(experiment),position = 1):
             try:
-                # print(scene)
-                gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
-                gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
+                print(scene)
+                # gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
+                # gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
 
-                gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
-                gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                # gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
+                # gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                gt_pcd, gt_labels = gt_getter.get_gt_point_cloud_and_labels(scene)
+                
+                # print((pcds_template.format(results_dir,experiment,scene)))
                 pcd_files = sorted(glob(pcds_template.format(results_dir,experiment,scene)))
+                
                 label_files = sorted(glob(labels_template.format(results_dir,experiment,scene)))
+                
                 pcd_file = pcd_files[-1]
                 labels_file = label_files[-1]
                 pcd = o3d.io.read_point_cloud(pcd_file)
+                
                 labels= pickle.load(open(labels_file,'rb'))
+                # print(f' Shape of the ground truth labels{gt_labels.shape}')
+                # print(f'shape of the recontructed pcd labels: {labels.shape}')
                 
 
                 # we then unscramble the labels:
@@ -80,33 +96,45 @@ def compute_mIoUs():
                 scrambler = np.zeros(points.shape[0]).astype(np.int64)
                 for i in range(points.shape[0]):
                     [k, idx, dist] = pcd_tree.search_knn_vector_3d(points[i],1)
-                    unscrambler[idx[0]] = i
+                    # unscrambler[idx[0]] = i
                     scrambler[i] = idx[0]
-                diff_labels = labels[unscrambler]
+                # diff_labels = labels[unscrambler]
+                diff_labels = labels
+                gt_labels = gt_labels[scrambler]
+                # print(gt_labels.shape)
+                # print(labels.shape)
 
-
-                gt_labels = np.argmax(gt_labels,axis =1)
+                # diff_labels = np.argmax(diff_labels, axis=1)
+                # gt_labels = np.argmax(gt_labels,axis =1)
                 totals_gt.extend(gt_labels.tolist())
                 totals.extend(diff_labels.tolist())
                 unique_gt = np.unique(gt_labels).tolist()
                 unique_pred = np.unique(diff_labels).tolist()
-                absent = set(list(range(21))) - set(unique_gt + unique_pred)
-                IoU = jaccard_index(task = 'multiclass',preds = torch.from_numpy(diff_labels),target= torch.from_numpy(gt_labels),num_classes = 21,average = None)
+                absent = set(list(range(150))) - set(unique_gt + unique_pred)
+                IoU = jaccard_index(task = 'multiclass',preds = torch.from_numpy(diff_labels),target= torch.from_numpy(gt_labels),num_classes = 150, ignore_index=150,average = None)
                 IoUs.update({scene:IoU})
                 absents.update({scene:absent})
+                del pcd_tree
+                del gt_labels
+                del labels
+                del diff_labels
+                del points
+                del pcd
+                gc.collect()
             except Exception as e:
                 print(scene,'mIoU Reconstruction',e)
                 continue
-        IoU = jaccard_index(task = 'multiclass',preds=torch.from_numpy(np.array(totals)),target = torch.from_numpy(np.array(totals_gt)),num_classes = 21,average = None)
-        non_null = np.array(totals_gt) != 0
+        IoU = jaccard_index(task = 'multiclass',preds=torch.from_numpy(np.array(totals)),target = torch.from_numpy(np.array(totals_gt)),num_classes = 150,ignore_index=150,average = None)
+        non_null = np.array(totals_gt) != 150
         accuracy = (np.array(totals)[non_null].argmax(axis = 1) == np.array(totals_gt)[non_null]).sum()/np.array(totals)[non_null].shape[0]
         accuracies.append(accuracy)
         pred = np.array(totals)[non_null].argmax(axis = 1).tolist()     
-        absent = set(list(range(21))) - set(pred + totals_gt)
+        absent = set(list(range(150))) - set(pred + totals_gt)
         IoUs.update({'aggregate':IoU})
         absents.update({'aggregate':absent})
         per_exp_IoUs.update({experiment:IoUs})
         per_exp_absents.update({experiment:absents})
+        print('here')
 
     a = IoUs['aggregate'].numpy()
     a[a!=0].mean()
@@ -116,9 +144,9 @@ def compute_mIoUs():
         IoUs = per_exp_IoUs[experiment]
         absents = per_exp_absents[experiment]
         expanded_scenes = selected_scenes+['aggregate']
-        metrics = np.zeros((len(expanded_scenes),21))
+        metrics = np.zeros((len(expanded_scenes),150))
         for i,scene in enumerate(expanded_scenes):
-        #     print(scene)
+            print(scene)
             metrics[i,:] = IoUs[scene]
             if(absents[scene]):
                 metrics[i,np.array(list(absents[scene]))] = np.nan
@@ -126,7 +154,7 @@ def compute_mIoUs():
         import pandas as pd
 
         df = pd.DataFrame(metrics)
-        classes = get_classes()
+        classes = get_scannetpp_classes()
         df.columns = classes
         df.loc[:,'scene'] = expanded_scenes
         df.loc[:,'experiment'] = short_name
@@ -142,7 +170,7 @@ def compute_mIoUs():
     df.rename(columns = df.loc['experiment',:],inplace = True)
     df.drop('experiment',inplace = True)
     df.drop('scene',inplace = True)
-    df.drop('irrelevant',inplace = True)
+    # df.drop('irrelevant',inplace = True)
     df.loc['mIoU',:] = df.mean(axis = 0)
     df.loc['Accuracy'] = accuracies
     selected_df = df.reset_index(drop = False)
@@ -157,18 +185,23 @@ def compute_mIoUs():
 def compute_mECEs():
     
     experiments,short_names = get_experiments_and_short_names()
-    classes = get_classes()
+    # classes = get_classes()
+    classes = get_scannetpp_classes
 
-    cal_scenes,test_scenes = get_larger_test_and_validation_scenes()
-    selected_scenes = test_scenes
+    # cal_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    # selected_scenes = test_scenes
     # selected_scenes = get_larger_test_and_validation_scenes()
-    
+    test_scenes = get_scannetpp_test_scenes()
+
+    selected_scenes = test_scenes
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
+
 
     ECE_by_experiment = []
 
     for g,experiment in enumerate(experiments):
-        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void)
-        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void)
+        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void, one_hot=False, n_classes=150)
+        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void, one_hot=False, n_classes=150)
         pcds_template = '{}/{}/{}/*.pcd'
         labels_template = '{}/{}/{}/labels*.p'
         gts = []
@@ -177,10 +210,11 @@ def compute_mECEs():
         for scene in tqdm(selected_scenes,desc = 'ECEs',position = 2):
             try:
 
-                gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
-                gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
-                gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
-                gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                # gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
+                # gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
+                # gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
+                # gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                gt_pcd, gt_labels = gt_getter.get_gt_point_cloud_and_labels(scene)
                 pcd_file = sorted(glob(pcds_template.format(results_dir,experiment,scene)))[-1]
                 labels_file = sorted(glob(labels_template.format(results_dir,experiment,scene)))[-1]
                 pcd = o3d.io.read_point_cloud(pcd_file)
@@ -201,18 +235,22 @@ def compute_mECEs():
                     [k, idx, dist] = pcd_tree.search_knn_vector_3d(points[i],1)
                 #     print(points[i]-gt_points[idx],i,idx)
                     scrambler[i] = idx[0]
-                labels[labels.sum(axis =1)==0] = 1/21.0
-                this_stage_labels = deepcopy(gt_labels)
-                this_stage_labels[:] = 1/21.0
-                this_stage_labels[scrambler] = labels
-                map_label = this_stage_labels.argmax(axis = 1)
-                map_gt = gt_labels.argmax(axis = 1)
-                gts.extend(map_gt)
-                preds.extend(map_label)
+                labels[labels.sum(axis =1)==0] = 1/150.0
+                # this_stage_labels = deepcopy(gt_labels)
+                # this_stage_labels[:] = 1/150.0
+                # this_stage_labels[scrambler] = labels
+                # map_label = this_stage_labels.argmax(axis = 1)
+                # map_gt = gt_labels.argmax(axis = 1)
+                # gts.extend(map_gt)
+                # preds.extend(map_label)
+                gt_labels = gt_labels[scrambler]
 
                 # update all_bins
-                mECE_cal.update_bins(this_stage_labels,gt_labels)
-                TL_ECE_cal.update_bins(this_stage_labels,gt_labels)
+                # mECE_cal.update_bins(this_stage_labels,gt_labels)
+                # TL_ECE_cal.update_bins(this_stage_labels,gt_labels)
+                mECE_cal.update_bins(labels,gt_labels)
+                TL_ECE_cal.update_bins(labels,gt_labels)
+
             except Exception as e:
                 print(e)
                 continue
@@ -224,14 +262,18 @@ def compute_mECEs():
     mtx = np.array(ECE_by_experiment)
 
     df = pd.DataFrame(mtx)
-    classes = ['null','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
-               'counter','desk','curtain','refrigerator','shower curtain','toilet','sink','bathtub','otherfurniture','aggregate','TL-ECE']
+    # classes = ['null','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
+    #            'counter','desk','curtain','refrigerator','shower curtain','toilet','sink','bathtub','otherfurniture','aggregate','TL-ECE']
+    classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
+        'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
+        'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
+        'radiator', 'glass', 'clock', 'flag', 'aggregate', 'TL-ECE']
     df.columns = classes
     df.loc[:,'experiments'] = short_names
     df = df.loc[:,[df.columns[-1]]+df.columns[:-1].tolist()]
-    df.loc[:,'mECE - things'] = df.loc[:,df.columns[4:-2]].mean(axis = 1)
+    df.loc[:,'mECE - things'] = df.loc[:,df.columns[5:-2]].mean(axis = 1)
     if(no_void):
-        df.loc[:,'mECE -all'] = df.loc[:,df.columns[2:-3]].mean(axis = 1)
+        df.loc[:,'mECE -all'] = df.loc[:,df.columns[1:-3]].mean(axis = 1)
         df.loc[:,'mECE - stuff'] = df.loc[:,df.columns[2:4]].mean(axis = 1)
     else:
         df.loc[:,'mECE -all'] = df.loc[:,df.columns[1:-3]].mean(axis = 1)
@@ -277,9 +319,13 @@ def compute_mECEs():
 
 
 def compute_brier_scores():
-    cal_scenes,test_scenes = get_larger_test_and_validation_scenes()
-    selected_scenes = test_scenes
+    # cal_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    # selected_scenes = test_scenes
     # selected_scenes = get_larger_test_and_validation_scenes()
+    test_scenes = get_scannetpp_test_scenes()
+
+    selected_scenes = test_scenes
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
 
     experiments,short_names = get_experiments_and_short_names()
     metric = BrierScore3D
@@ -288,7 +334,7 @@ def compute_brier_scores():
     per_scene_mECEs = []
     for g,experiment in enumerate(experiments):
         multiply = False
-        mECE_cal = metric(no_void = no_void)
+        mECE_cal = metric(no_void = False, n_classes=150, one_hot=False, ignore_last_from_gt=True)
 
         # cc_3d = Calibration_calc_3D(no_void = True)
         pcds_template = '{}/{}/{}/*.pcd'
@@ -301,12 +347,13 @@ def compute_brier_scores():
         per_scene_mECE = []
         for scene in selected_scenes:
             try:
-                per_scene_cal =  metric(no_void = no_void)
+                per_scene_cal =  metric(no_void = False, n_classes=150, one_hot=False, ignore_last_from_gt=True)
 
-                gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
-                gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
-                gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
-                gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                # gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
+                # gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
+                # gt_pcd = o3d.io.read_point_cloud(gt_pcd_file)
+                # gt_labels= pickle.load(open(gt_labels_file,'rb'))
+                gt_pcd, gt_labels = gt_getter.get_gt_point_cloud_and_labels(scene)
                 pcd_file = sorted(glob(pcds_template.format(results_dir,experiment,scene)))[-1]
                 labels_file = sorted(glob(labels_template.format(results_dir,experiment,scene)))[-1]
             #     for pcd_file,labels_file in zip(pcd_files,label_files):
@@ -321,7 +368,7 @@ def compute_brier_scores():
                 if(np.any(labels > 1)):
                     labels = labels/labels.sum(axis = 1,keepdims = True)
                 labels = labels/labels.sum(axis = 1,keepdims = True)
-                labels[np.isnan(labels)] = 1/21
+                labels[np.isnan(labels)] = 1/150
                 pcd_tree = o3d.geometry.KDTreeFlann(gt_pcd)
                 points = np.asarray(pcd.points)
                 gt_points = np.asarray(gt_pcd.points)
@@ -330,17 +377,25 @@ def compute_brier_scores():
                 for i in range(points.shape[0]):
                     [k, idx, dist] = pcd_tree.search_knn_vector_3d(points[i],1)
                     scrambler[i] = idx[0]
-                labels[labels.sum(axis =1)==0] = 1/21.0
-                this_stage_labels = deepcopy(gt_labels)
-                this_stage_labels[:] = 1/21.0
-                this_stage_labels[scrambler] = labels
-                map_label = this_stage_labels.argmax(axis = 1)
-                map_gt = gt_labels.argmax(axis = 1)
+                labels[labels.sum(axis =1)==0] = 1/150.0
+                # this_stage_labels = deepcopy(gt_labels)
+                # this_stage_labels[:] = 1/21.0
+                # this_stage_labels[scrambler] = labels
+                # map_label = this_stage_labels.argmax(axis = 1)
+                # map_gt = gt_labels.argmax(axis = 1)
+                gt_labels = gt_labels[scrambler]
+                ma = np.argmax(gt_labels)
+                # print(gt_labels[ma])
 
-                gts.extend(map_gt)
-                preds.extend(map_label)
-                mECE_cal.update_bins(this_stage_labels,map_gt)
-                per_scene_cal.update_bins(this_stage_labels,map_gt)
+                # gts.extend(map_gt)
+                # preds.extend(map_label)
+                # mECE_cal.update_bins(this_stage_labels,map_gt)
+                # per_scene_cal.update_bins(this_stage_labels,map_gt)
+                # print('here1')
+                mECE_cal.update_bins(labels,gt_labels)
+                # print('here2')
+                per_scene_cal.update_bins(labels,gt_labels)
+                # print('here3')
                 per_scene_mECE.append(per_scene_cal.return_score())
             except Exception as e:
                 print(e)
@@ -378,4 +433,7 @@ p3.start()
 p1.join()
 p2.join()
 p3.join()
+# compute_mIoUs()
+# compute_mECEs()
+# compute_brier_scores()
 

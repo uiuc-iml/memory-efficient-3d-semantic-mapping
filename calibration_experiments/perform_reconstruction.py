@@ -38,8 +38,8 @@ os.environ["NUMEXPR_NUM_THREADS"] = "2" # export NUMEXPR_NUM_THREADS=6
 
 
 from experiment_setup import Experiment_Generator
-from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes, get_small_test_scenes2, get_fixed_train_and_val_splits
-from utils.sens_reader import scannet_scene_reader
+from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes, get_small_test_scenes2, get_fixed_train_and_val_splits, get_scannetpp_test_scenes
+from utils.sens_reader import scannet_scene_reader, ScanNetPPReader
 
 processes = 1
 
@@ -62,38 +62,53 @@ def save_plot(data, ylabel, title, filename):
 
 
 def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
-    iteration_times = []
-    segmentation_times = []
+    # iteration_times = []
+    # segmentation_times = []
     reconstruction_times = []
-    combined_times = []
+    # combined_times = []
     gpu_memory_usage = []
-    peak_memory_usage = []
-    # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-    # arr_des = '/home/motion/semanticmapping/visuals/arrays/{}/maskformer_default'.format(scene)
-    # plot_dir = os.path.join(des, 'topk')
-    # arr_dir = os.path.join(arr_des, 'topk')
-    # if not os.path.exists(plot_dir):
-    #     os.makedirs(plot_dir)
-    # if not os.path.exists(arr_dir):
-    #     os.makedirs(arr_dir)
+    # peak_memory_usage = []
+    # # des = "/home/motion/semanticmapping/visuals/maskformer_default"
+    arr_des = '/home/motion/semanticmapping/visuals/arrays/{}/cacherelease'.format(scene)
+    # # plot_dir = os.path.join(des, 'topk')
+    arr_dir = os.path.join(arr_des, f'{experiment_name}')
+    if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
+        k = experiment_settings['k']
+        arr_dir = os.path.join(arr_des, f'{experiment_name}{k}')
+    
+    # # if not os.path.exists(plot_dir):
+    # #     os.makedirs(plot_dir)
+    if not os.path.exists(arr_dir):
+        os.makedirs(arr_dir)
 
 
-    EG = Experiment_Generator(n_labels=151)
+    EG = Experiment_Generator(n_labels=150)
+    # EG = Experiment_Generator(n_labels=21)
     fnames = get_filenames()
     rec,model = EG.get_reconstruction_and_model(experiment = experiment_settings,process_id = multiprocessing.current_process()._identity[0])
-    if(experiment_settings['integration'] == 'Generalized'):
-        get_semantics = model.get_raw_logits
-    # elif(experiment_settings['integration'] == 'Histogram'):
-    #     get_semantics = model.classify
+    # print(experiment_settings)
+    if(experiment_settings['segmentation'] == "CLIP"):
+        get_semantics = model.get_pixel_features
     else:
-        get_semantics = model.get_pred_probs
+        if(experiment_settings['integration'] == 'Generalized'):
+            get_semantics = model.get_raw_logits
+        # elif(experiment_settings['integration'] == 'Histogram'):
+        #     get_semantics = model.classify
+        else:
+            get_semantics = model.get_pred_probs
 
     # if(not debug):
     #     root_dir = "/tmp/scannet_v2"
     # else:
     #     root_dir = "/scratch/bbuq/jcorreiamarques/3d_calibration/scannet_v2"
-    root_dir = fnames['ScanNet_root_dir']
-    savedir = "{}/{}/".format(fnames['results_dir'],experiment_name)
+    root_dir = fnames['ScanNetpp_root_dir']
+    # root_dir = fnames['ScanNet_root_dir']
+    savedir = "{}/{}/".format(fnames['results_dir'], experiment_name)
+    if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
+        k1 = experiment_settings['k']
+        savedir = "{}/{}/".format(fnames['results_dir'], f'{experiment_name}{k}')
+    
+
     # savedir = '/scratch/bbuq/jcorreiamarques/3d_calibration/Results/{}/'.format(experiment_name)
     if(not os.path.exists(savedir)):
         try:
@@ -116,7 +131,8 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
 
 
 
-        my_ds = scannet_scene_reader(root_dir, scene ,lim = lim,disable_tqdm = True)
+        # my_ds = scannet_scene_reader(root_dir, scene ,lim = lim,disable_tqdm = True)
+        my_ds = ScanNetPPReader(root_dir, scene)
         total_len = len(my_ds)
 
         if(lim == -1):
@@ -150,7 +166,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
             # print(segmentation_end_time - segmentation_start_time)
             # segmentation_times.append(segmentation_end_time - segmentation_start_time)
 
-            # reconstruction_start_time = time.time()
+            reconstruction_start_time = time.time()
 
             if(oracle):
                 semantic_label_gt = cv2.resize(data_dict['semantic_label'],(depth.columns,depth.rows),interpolation= cv2.INTER_NEAREST)
@@ -158,16 +174,18 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
                             data_dict['pose'],semantic_label = semantic_label,semantic_label_gt = semantic_label_gt)
             else:
                 rec.update_vbg(data_dict['depth'],data_dict['intrinsics_depth'][:3,:3].astype(np.float64),
-                            data_dict['pose'],semantic_label = semantic_label)
+                            data_dict['pose'],semantic_label = semantic_label, scene = scene)
             
-            # reconstruction_end_time = time.time()
-            # reconstruction_times.append(reconstruction_end_time - reconstruction_start_time)
+            reconstruction_end_time = time.time()
+            reconstruction_times.append(reconstruction_end_time - reconstruction_start_time)
             # combined_times.append(reconstruction_end_time - segmentation_start_time)
             # end_time = time.time()
             # iteration_times.append(end_time - start_time)
-            # gpu_memory_usage.append(get_gpu_memory_usage())
-            # gpu_memory_usage_np = np.array(gpu_memory_usage)
-            # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+            gpu_memory_usage.append(get_gpu_memory_usage())
+            gpu_memory_usage_np = np.array(gpu_memory_usage)
+            np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+            reconstruction_times_np = np.array(reconstruction_times)
+            np.save(os.path.join(arr_dir, "reconstruction_times.npy"), reconstruction_times_np)
             del intrinsic
             del depth
         # save_plot(gpu_memory_usage, 'Memory Usage (GB)', 'GPU Memory Usage Over Iterations', os.path.join(plot_dir, 'gpu_memory_usage.png'))
@@ -187,8 +205,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
 
         # # Save reconstruction times plot
         # save_plot(reconstruction_times, 'Time (s)', 'Reconstruction Time Per Iteration', os.path.join(plot_dir, 'reconstruction_times.png'))
-        # reconstruction_times_np = np.array(reconstruction_times)
-        # np.save(os.path.join(arr_dir, "reconstruction_times.npy"), reconstruction_times_np)
+        
 
 
         # # Save combined times plot
@@ -255,15 +272,17 @@ def main():
         import multiprocessing
         debug = args.debug
         oracle = experiment_settings['oracle']
-        # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
-        # selected_scenes = sorted(test_scenes)
+        val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+        selected_scenes = sorted(test_scenes)
         test_scenes1 = get_small_test_scenes2()
         # dump, test_scenes1 = get_fixed_train_and_val_splits()
         selected_scenes1 = sorted(test_scenes1)
+        test_scenes_pp = get_scannetpp_test_scenes()
+        selected_scenes_pp = sorted(test_scenes_pp)
         p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
 
         res = []
-        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle),selected_scenes1,chunksize = 1), total= len(selected_scenes1),position = 0,desc = 'tot_scenes'):
+        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle),selected_scenes_pp,chunksize = 1), total= len(selected_scenes_pp),position = 0,desc = 'tot_scenes'):
                 res.append(a)
 
         

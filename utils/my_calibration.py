@@ -43,13 +43,14 @@ class Calibration_calc:
         return (share*np.nan_to_num(np.abs(acc-conf),nan = 0)).sum()
 
 class Calibration_calc_3D:
-    def __init__(self, tiers =np.arange(11)/10,no_void = False,one_hot = True):
+    def __init__(self, tiers =np.arange(11)/10,no_void = False,one_hot = True, ignore_last_from_gt=True):
         self.tiers = tiers
         self.total_bin_members = np.zeros(len(tiers)-1)
         self.correct_bin_members = np.zeros(len(tiers)-1)
         self.total_bin_confidence = np.zeros(len(tiers)-1)
         self.no_void = no_void
         self.one_hot = one_hot
+        self.ignore_last_from_gt = ignore_last_from_gt
     def update_bins(self,semantic_label,semantic_label_gt):
         if(self.no_void):
             if(self.one_hot):
@@ -58,6 +59,14 @@ class Calibration_calc_3D:
                 gt_labels = semantic_label_gt
             semantic_label_gt = semantic_label_gt[gt_labels != 0]
             semantic_label = semantic_label[gt_labels!=0]
+        if(self.ignore_last_from_gt):
+            if(self.one_hot):
+                gt_labels = semantic_label_gt.argmax(axis=1)
+            else:
+                gt_labels = semantic_label_gt
+            semantic_label_gt = semantic_label_gt[gt_labels != 150]
+            semantic_label = semantic_label[gt_labels!=150]
+
         max_conf = semantic_label.max(axis = 1)
         # total_bin_members = np.zeros(len(self.tiers)-1)
         # correct_bin_members = np.zeros(len(self.tiers)-1)
@@ -90,7 +99,7 @@ class Calibration_calc_3D:
             return (share*np.nan_to_num(np.abs(acc-conf),nan = 0)).sum()
 
 class mECE_Calibration_calc_3D:
-    def __init__(self, tiers =np.arange(11)/10,no_void = False,one_hot = True,n_classes = 21):
+    def __init__(self, tiers =np.arange(11)/10,no_void = False,one_hot = True,n_classes = 21, ignore_last_from_gt=True):
         self.tiers = tiers
         self.no_void = no_void
         self.one_hot = one_hot
@@ -187,12 +196,13 @@ class All_Predictions_Calibration:
         return (share*np.nan_to_num(np.abs(acc-conf),nan = 0)).sum()
     
 class BrierScore3D:
-    def __init__(self,n_classes = 21,no_void = True,one_hot = False):
+    def __init__(self,n_classes = 150,no_void = True,one_hot = False, ignore_last_from_gt=False):
         self.n_classes = n_classes
         self.no_void = no_void
         self.one_hot = one_hot
         self.total_entries = 0
         self.current_score = 0
+        self.ignore_last_from_gt = ignore_last_from_gt
     def update_bins(self,semantic_label,semantic_label_gt):
         if self.no_void:
             if(not self.one_hot):
@@ -207,6 +217,29 @@ class BrierScore3D:
             # pdb.set_trace()
             self.current_score = (self.current_score*self.total_entries + discrepancy*entries)/(entries+self.total_entries)
             self.total_entries += entries
+        else:
+            if(self.ignore_last_from_gt):
+                ignore_last_mask = semantic_label_gt != 150
+                semantic_label_gt = semantic_label_gt[ignore_last_mask]
+                semantic_label = semantic_label[ignore_last_mask]
+                if(not self.one_hot):
+                    semantic_label_gt = nn.functional.one_hot(torch.from_numpy(semantic_label_gt.astype(np.int64)),num_classes = self.n_classes).numpy().astype(np.float32)
+                
+                discrepancy = np.power(semantic_label-semantic_label_gt,2).sum(axis = 1).mean()
+                entries = semantic_label.shape[0]
+                # pdb.set_trace()
+                self.current_score = (self.current_score*self.total_entries + discrepancy*entries)/(entries+self.total_entries)
+                self.total_entries += entries
+            else:
+                if(not self.one_hot):
+                    semantic_label_gt = nn.functional.one_hot(torch.from_numpy(semantic_label_gt.astype(np.int64)),num_classes = self.n_classes).numpy().astype(np.float32)
+                
+                discrepancy = np.power(semantic_label-semantic_label_gt,2).sum(axis = 1).mean()
+                entries = semantic_label.shape[0]
+                # pdb.set_trace()
+                self.current_score = (self.current_score*self.total_entries + discrepancy*entries)/(entries+self.total_entries)
+                self.total_entries += entries
+
     def return_score(self):
         return self.current_score
 

@@ -1,0 +1,7 @@
+voxel_size: 0.025
+res: 8
+n_labels: 150
+depth_scale: 1000.0
+depth_max: 5.0
+miu: 0.001
+truncation_vsize_multiple: 8

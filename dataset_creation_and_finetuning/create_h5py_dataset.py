@@ -25,11 +25,12 @@ if __name__ == "__main__":
     parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     sys.path.append(parent_dir)
 
-    from utils.segmentation_model_loader import FineTunedESANet, FineTunedTSegmenter
+    from utils.segmentation_model_loader import FineTunedESANet, FineTunedTSegmenter, MaskformerSegmenter
     from calibration_experiments.experiment_setup import Experiment_Generator
     from utils.rendering_utils import get_camera_rays, render_depth_and_normals
-    from utils.ScanNet_scene_definitions import get_filenames,get_fixed_train_and_val_splits
-    from utils.sens_reader import scannet_scene_reader
+    from utils.ScanNet_scene_definitions import get_filenames,get_fixed_train_and_val_splits,h5pyscenes, get_scannetpp_test_scenes, get_scannetpp_train_scenes
+    from utils.sens_reader import scannet_scene_reader, ScanNetPPReader
+    from reconstruction import Reconstruction
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -64,21 +65,23 @@ if __name__ == "__main__":
     dataset_filename = fnames[
         "h5py_dataset_dir"
     ] + "/{}_calibration_{}_logits_lzf.hdf5".format(model_type, split)
-    root_dir = fnames["ScanNet_root_dir"]
+    root_dir = fnames["ScanNetpp_root_dir"]
     vbg_file_template = fnames["results_dir"] + "/{}/gt_vbg_{}.npz"
     experiment = "reconstruction_gts"
     singleton_save_folder = fnames["singleton_dataset_dir"] + "/{}/{}/{}"
     singleton_save_dir = singleton_save_folder + "/{}.p"
     calibration_index_dict = "{}_calibration_index_dict.p".format(model_type)
-    base_dataset = True
-    get_normal = True
-    do_the_rest = True
-    update_the_index_dict = True
-    singleton_voxels = True
+    base_dataset = False
+    get_normal = False
+    # do_the_rest = False
+    do_the_rest = False
+    update_the_index_dict = False
+    singleton_voxels = False
     singleton_voxels_h5py = True
     train, val = get_fixed_train_and_val_splits()
+    train1 = get_scannetpp_train_scenes()
     if split == "train":
-        calibration_scenes = train
+        calibration_scenes = train1
     else:
         calibration_scenes = val
 
@@ -129,7 +132,7 @@ if __name__ == "__main__":
         f = h5py.File(dataset_filename, "a")
 
         if model_type == "Segformer":
-            model = FineTunedTSegmenter(temperature=1)
+            model = MaskformerSegmenter()
         elif model_type == "ESANet":
             model = FineTunedESANet(temperature=1)
 
@@ -144,8 +147,12 @@ if __name__ == "__main__":
             #     tm = o3d.t.geometry.TriangleMesh.from_legacy(
             #                                     triangle_mesh.cpu().to_legacy())
             rscene.add_triangles(triangle_mesh.cpu())
+            # tm = o3d.t.geometry.TriangleMesh.from_legacy(
+            #                                     triangle_mesh.to_legacy())
+            # rscene.add_triangles(tm)
             del triangle_mesh
             del vbg
+            # del rec
 
             try:
                 g = f.create_group(scene)
@@ -153,7 +160,7 @@ if __name__ == "__main__":
                 print(e)
                 g = f[scene]
             lim = -1
-            my_ds = scannet_scene_reader(root_dir, scene, lim=lim, disable_tqdm=True)
+            my_ds = ScanNetPPReader(root_dir, scene)
             data_dict = my_ds[0]
             total_len = len(my_ds)
 
@@ -161,99 +168,101 @@ if __name__ == "__main__":
                 lim = total_len
             try:
                 g.attrs["depth_intrinsics"] = data_dict["intrinsics_depth"]
-                g.attrs["color_intrinsics"] = data_dict["intrinsics_color"]
+                # g.attrs["color_intrinsics"] = data_dict["intrinsics_color"]
                 logits = g.create_dataset(
                     "logits",
-                    (lim, 480, 640, 21),
-                    maxshape=(None, 480, 640, 21),
-                    chunks=(1, 480, 640, 21),
+                    (int(lim/20)+1, 192, 256, 150),
+                    maxshape=(None, 192, 256, 150),
+                    chunks=(1, 192, 256, 150),
                     dtype=np.float16,
                     compression="lzf",
                 )
                 depths = g.create_dataset(
                     "depth",
-                    (lim, 480, 640),
-                    maxshape=(None, 480, 640),
-                    chunks=(1, 480, 640),
+                    (int(lim/20)+1, 192, 256),
+                    maxshape=(None, 192, 256),
+                    chunks=(1, 192, 256),
                     dtype=np.uint16,
                     compression="lzf",
                 )
                 poses = g.create_dataset(
                     "poses",
-                    (lim, 4, 4),
+                    (int(lim/20)+1, 4, 4),
                     maxshape=(None, 4, 4),
                     chunks=(1, 4, 4),
                     dtype=np.uint32,
                 )
                 indices = g.create_dataset(
                     "indices",
-                    (lim, 480, 640),
-                    maxshape=(None, 480, 640),
-                    chunks=(1, 480, 640),
+                    (int(lim/20)+1, 192, 256),
+                    maxshape=(None, 192, 256),
+                    chunks=(1, 192, 256),
                     dtype=np.uint32,
                     compression="lzf",
                 )
-                gts = g.create_dataset(
-                    "gt",
-                    (lim, 480, 640),
-                    maxshape=(None, 480, 640),
-                    chunks=(1, 480, 640),
-                    dtype=np.uint8,
-                    compression="lzf",
-                )
+                # gts = g.create_dataset(
+                #     "gt",
+                #     (lim, 480, 640),
+                #     maxshape=(None, 480, 640),
+                #     chunks=(1, 480, 640),
+                #     dtype=np.uint8,
+                #     compression="lzf",
+                # )
             except:
+                print("here")
                 logits = g["logits"]
                 depths = g["depth"]
                 poses = g["poses"]
                 indices = g["indices"]
-                gts = g["gt"]
+                # gts = g["gt"]
             #     normals = g.create_dataset('')
             total_images = 0
             invalid_poses = 0
             for i in tqdm(range(lim), desc="main_dataset"):
-                try:
-                    data_dict = my_ds[i]
-                    depth = data_dict["depth"]
-                    depth2 = o3d.t.geometry.Image(depth).to(device)
-                    color = data_dict["color"]
-                    pose = data_dict["pose"]
-                    if np.any(np.logical_not(np.isfinite((pose)))):
-                        invalid_poses += 1
-                        print(
-                            "invalid poses {}, actual frame {}".format(invalid_poses, i)
-                        )
-                        continue
+                if (i%20 == 0):
+                    try:
+                        data_dict = my_ds[i]
+                        depth = data_dict["depth"]
+                        depth2 = o3d.t.geometry.Image(depth).to(device)
+                        color = data_dict["color"]
+                        pose = data_dict["pose"]
+                        if np.any(np.logical_not(np.isfinite((pose)))):
+                            invalid_poses += 1
+                            print(
+                                "invalid poses {}, actual frame {}".format(invalid_poses, i)
+                            )
+                            continue
 
-                    gt = cv2.resize(
-                        data_dict["semantic_label"],
-                        (depth2.columns, depth2.rows),
-                        interpolation=cv2.INTER_NEAREST,
-                    ).astype(np.uint8)
-                    if np.any(np.logical_not(np.isfinite(gt))):
-                        print("invalid gt")
+                        # gt = cv2.resize(
+                        #     data_dict["semantic_label"],
+                        #     (depth2.columns, depth2.rows),
+                        #     interpolation=cv2.INTER_NEAREST,
+                        # ).astype(np.uint8)
+                        # if np.any(np.logical_not(np.isfinite(gt))):
+                        #     print("invalid gt")
+                            # continue
+                    except:
+                        traceback.print_exc()
                         continue
-                except:
-                    traceback.print_exc()
-                    continue
-                # pdb.set_trace()
-                depths[total_images, :, :] = depth
-                poses[total_images, :, :] = pose
-                logit = model.get_raw_logits(
-                    color, depth, depth2.rows, depth2.columns
-                ).astype(np.float16)
-                gts[total_images, :, :] = gt
-                logits[total_images, :, :, :] = logit
-                # print('got to rendering')
-                index = render_indices2(
-                    rscene, data_dict["intrinsics_depth"], pose, depth
-                ).numpy()
-                # print('rendered')
-                index[index == rscene.INVALID_ID] = 0
-                indices[total_images, :, :] = index
-                total_images += 1
-                # print('saving')
+                    # pdb.set_trace()
+                    depths[total_images, :, :] = depth
+                    poses[total_images, :, :] = pose
+                    logit = model.get_raw_logits(
+                        color, depth, depth2.rows, depth2.columns
+                    ).astype(np.float16)
+                    # gts[total_images, :, :] = gt
+                    logits[total_images, :, :, :] = logit
+                    # print('got to rendering')
+                    index = render_indices2(
+                        rscene, data_dict["intrinsics_depth"], pose, depth
+                    ).numpy()
+                    # print('rendered')
+                    index[index == rscene.INVALID_ID] = 0
+                    indices[total_images, :, :] = index
+                    total_images += 1
+                    # print('saving')
             # resizing the dataset to account for failed openings
-            for dset in [logits, depths, poses, indices, gts]:
+            for dset in [logits, depths, poses, indices]:
                 dshape = list(dset.shape)
                 dshape[0] = total_images
                 dset.resize(dshape)
@@ -295,7 +304,7 @@ if __name__ == "__main__":
             #     tm = o3d.t.geometry.TriangleMesh.from_legacy(
             #                                     triangle_mesh.cpu().to_legacy())
             lim = -1
-            my_ds = scannet_scene_reader(root_dir, scene, lim=lim, disable_tqdm=False)
+            my_ds = ScanNetPPReader(root_dir, scene)
             data_dict = my_ds[0]
             total_len = len(my_ds)
 
@@ -305,9 +314,9 @@ if __name__ == "__main__":
             try:
                 normals = g.create_dataset(
                     "normals",
-                    (lim, 480, 640, 3),
-                    maxshape=(None, 480, 640, 3),
-                    chunks=(1, 480, 640, 3),
+                    (int(lim/20)+1, 192, 256, 3),
+                    maxshape=(None, 192, 256, 3),
+                    chunks=(1, 192, 256, 3),
                     dtype=np.float16,
                     compression="lzf",
                 )
@@ -316,51 +325,52 @@ if __name__ == "__main__":
                 normals = g["normals"]
             total_images = 0
             for i in tqdm(range(lim), desc="normals"):
-                try:
-                    data_dict = my_ds[i]
-                    depth = data_dict["depth"]
-                    depth2 = o3d.t.geometry.Image(depth).to(device)
-                    color = data_dict["color"]
-                    pose = data_dict["pose"]
-                    if np.any(np.logical_not(np.isfinite((pose)))):
-                        print("invalid pose")
-                        continue
+                if (i%20 == 0):
+                    try:
+                        data_dict = my_ds[i]
+                        depth = data_dict["depth"]
+                        depth2 = o3d.t.geometry.Image(depth).to(device)
+                        color = data_dict["color"]
+                        pose = data_dict["pose"]
+                        if np.any(np.logical_not(np.isfinite((pose)))):
+                            print("invalid pose")
+                            continue
 
-                    gt = cv2.resize(
-                        data_dict["semantic_label"],
-                        (depth2.columns, depth2.rows),
-                        interpolation=cv2.INTER_NEAREST,
-                    ).astype(np.uint8)
-                    if np.any(np.logical_not(np.isfinite(gt))):
-                        print("invalid gt")
+                        # gt = cv2.resize(
+                        #     data_dict["semantic_label"],
+                        #     (depth2.columns, depth2.rows),
+                        #     interpolation=cv2.INTER_NEAREST,
+                        # ).astype(np.uint8)
+                        # if np.any(np.logical_not(np.isfinite(gt))):
+                        #     print("invalid gt")
+                        #     continue
+                        # gt = cv2.resize(data_dict['semantic_label'],(depth2.columns,depth2.rows),interpolation= cv2.INTER_NEAREST)
+                    except:
+                        traceback.print_exc()
                         continue
-                    # gt = cv2.resize(data_dict['semantic_label'],(depth2.columns,depth2.rows),interpolation= cv2.INTER_NEAREST)
-                except:
-                    traceback.print_exc()
-                    continue
-                # pdb.set_trace()
-                with torch.no_grad():
-                    semantic_label = get_semantics(
-                        data_dict["color"],
-                        depth=data_dict["depth"],
-                        x=depth2.rows,
-                        y=depth2.columns,
+                    # pdb.set_trace()
+                    with torch.no_grad():
+                        semantic_label = get_semantics(
+                            data_dict["color"],
+                            depth=data_dict["depth"],
+                            x=depth2.rows,
+                            y=depth2.columns,
+                        )
+                    rec.update_vbg(
+                        data_dict["depth"],
+                        data_dict["intrinsics_depth"][:3, :3].astype(np.float64),
+                        data_dict["pose"],
+                        semantic_label=semantic_label,
                     )
-                rec.update_vbg(
-                    data_dict["depth"],
-                    data_dict["intrinsics_depth"][:3, :3].astype(np.float64),
-                    data_dict["pose"],
-                    semantic_label=semantic_label,
-                )
-                rendered_depth, rendered_normals = render_depth_and_normals(
-                    rec.vbg,
-                    depth,
-                    data_dict["intrinsics_depth"][:3, :3],
-                    data_dict["pose"],
-                    use_depth=True,
-                )
-                normals[total_images, :, :, :] = rendered_normals.astype(np.float16)
-                total_images += 1
+                    rendered_depth, rendered_normals = render_depth_and_normals(
+                        rec.vbg,
+                        depth,
+                        data_dict["intrinsics_depth"][:3, :3],
+                        data_dict["pose"],
+                        use_depth=True,
+                    )
+                    normals[total_images, :, :, :] = rendered_normals.astype(np.float16)
+                    total_images += 1
             del rec
             torch.cuda.empty_cache()
             # resizing the dataset to account for failed openings
@@ -380,7 +390,7 @@ if __name__ == "__main__":
             lim = -1
             g = f[scene]
             logits = g["logits"]
-            gts = g["gt"]
+            # gts = g["gt"]
             indices = g["indices"]
             depths = g["depth"]
             poses = g["poses"]
@@ -395,7 +405,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
                 triangle_gts = g["triangle_gts"]
-            triangle_gts2 = np.zeros((max_triangle_index, 21))
+            triangle_gts2 = np.zeros((max_triangle_index, 150))
             max_idxs = []
             for i in tqdm(range(indices.shape[0]), desc="triangle_gts"):
                 #         pass
@@ -465,7 +475,7 @@ if __name__ == "__main__":
             indices_ds = g["indices"][:]
             poses_ds = g["poses"][:]
             depth_ds = g["depth"][:]
-            triangle_gts_ds = g["triangle_gts"][:]
+            # triangle_gts_ds = g["triangle_gts"][:]
             # if(logits_ds.shape[0]>=3000):
             normals_ds = g["normals"]
             # else:
@@ -483,7 +493,7 @@ if __name__ == "__main__":
                 data_dicts = []
                 for i in range(selected_idxs.shape[0]):
                     data_dicts.append(
-                        {"logits": [], "depth": [], "angle": [], "gt": []}
+                        {"logits": [], "depth": [], "angle": []}
                     )
                 chunks = logits_ds.shape[0] // 100
                 a = np.array_split(range(logits_ds.shape[0]), chunks)
@@ -516,8 +526,8 @@ if __name__ == "__main__":
                     del depth
                     gc.collect()
 
-                for local_idx, idx in enumerate(selected_idxs):
-                    data_dicts[local_idx]["gt"] = np.array([triangle_gts_ds[idx]])
+                # for local_idx, idx in enumerate(selected_idxs):
+                #     data_dicts[local_idx]["gt"] = np.array([triangle_gts_ds[idx]])
                 for dct in tqdm(data_dicts, desc="saving"):
                     dct.update({"logits": np.array(dct["logits"])})
                     dct.update({"depth": np.array(dct["depth"])})
@@ -537,7 +547,7 @@ if __name__ == "__main__":
 
             del logits_ds
             del normals_ds
-            del triangle_gts_ds
+            # del triangle_gts_ds
             del indices_ds
             gc.collect()
 
@@ -577,11 +587,11 @@ if __name__ == "__main__":
                     
                 result.update({key:tmp})
                 
-            labels = [d['gt'] for d in data]
+            # labels = [d['gt'] for d in data]
             padded_ds = {}
             for key in keys:
                 padded_ds.update({key:pad_sequence(result[key],batch_first = True)})
-            padded_ds.update({'label':torch.tensor(np.array(labels))})
+            # padded_ds.update({'label':torch.tensor(np.array(labels))})
             del result
             del data
             return padded_ds
@@ -595,16 +605,16 @@ if __name__ == "__main__":
 
             lim = len(train_ds)
             try:
-                logits = f.create_dataset("logits", (lim,1000,21), maxshape=(None, 1000,21),chunks = (1,1000,21),dtype = np.float16,compression = 'lzf')
+                logits = f.create_dataset("logits", (lim,1000,150), maxshape=(None, 1000,150),chunks = (1,1000,150),dtype = np.float16,compression = 'lzf')
                 depths = f.create_dataset("depth", (lim,1000), maxshape=(None, 1000),chunks = (1,1000),dtype = np.float16,compression = 'lzf')
                 angles = f.create_dataset("angle", (lim,1000), maxshape=(None, 1000),chunks = (1,1000),dtype = np.float16,compression = 'lzf')
-                labels = f.create_dataset("label", (lim,1), maxshape=(None, 1),chunks = (1,1),dtype = np.uint8,compression = 'lzf')
+                # labels = f.create_dataset("label", (int(lim/20)+1,1), maxshape=(None, 1),chunks = (1,1),dtype = np.uint8,compression = 'lzf')
             except Exception as e:
                 print(e)
                 logits = f["logits"]
                 depths = f["depth"]
                 angles = f["angle"]
-                labels = f["label"]
+                # labels = f["label"]
                 
             # g = f.create_group('train')
 
@@ -615,12 +625,12 @@ if __name__ == "__main__":
                 logit = dct['logits'].cpu().numpy().astype(np.float16)
                 depth = dct['depth'].cpu().numpy().astype(np.float16)
                 angle = dct['angle'].cpu().numpy().astype(np.float16)
-                label = dct['label'].cpu().numpy().astype(np.uint8).flatten()
+                # label = dct['label'].cpu().numpy().astype(np.uint8).flatten()
                 entries = logit.shape[1]  
                 logits[i,:entries,:] = logit
                 depths[i,:entries] = depth
                 angles[i,:entries] = angle
-                labels[i,0] = label
+                # labels[i,0] = label
                 i+=1
             f.close()
 
@@ -637,13 +647,13 @@ if __name__ == "__main__":
                     self.logits = self.f['logits']
                     self.depth = self.f['depth']
                     self.angle = self.f['angle']
-                    self.label = self.f['label']
+                    # self.label = self.f['label']
                     
                 def __len__(self):
                     return self.size
                 def __getitem__(self,idx):
                     sample = {'logits':self.logits[idx,:,:],'depth':self.depth[idx,:],
-                            'angle':self.angle[idx,:],'label':self.label[idx]}
+                            'angle':self.angle[idx,:]}
                     return sample
             
             def worker_init_fn(worker_id):
