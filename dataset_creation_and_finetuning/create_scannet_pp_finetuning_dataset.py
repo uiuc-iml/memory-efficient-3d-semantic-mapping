@@ -34,12 +34,13 @@ original_train =  pd.read_csv('./nvs_sem_train.txt',header = None).iloc[:,0]
 val_scenes = pd.read_csv('./newval.txt',header = None).iloc[:,0]
 test_scenes =  pd.read_csv('./newtest.txt',header = None).iloc[:,0]
 train_scenes = original_train.loc[np.logical_and(np.logical_not(original_train.isin(val_scenes)),np.logical_not(original_train.isin(test_scenes)))]
-print(train_scenes.shape[0],print(original_train.shape[0]))
+print(train_scenes.shape[0],original_train.shape[0])
 # def data_generator():
 i = 0
 sfs = []
 rgbs = []
-all_frames = pd.Series(sorted(glob('/home/motion/data/scannet_pp/data/**/gt_semantics/*.png',recursive = True)))
+all_frames = pd.Series(sorted(glob('/work/hdd/bebg/data/scannet_pp/data/**/gt_semantics/*.png',recursive = True)))
+
 scene_names = all_frames.str.split('/',expand = True).iloc[:,-4]
 train_semantic_images = all_frames.loc[scene_names.isin(train_scenes.iloc[:])]
 val_semantic_images = all_frames.loc[scene_names.isin(val_scenes.iloc[:])]
