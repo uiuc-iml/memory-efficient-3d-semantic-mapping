@@ -30,19 +30,19 @@ from tqdm import tqdm
 
 
 
-train_scenes = pd.read_csv('./newtrain.txt', header = None)
-val_scenes = pd.read_csv('./newval.txt',header = None)
-test_scenes =  pd.read_csv('./newtest.txt',header = None)
-
+original_train =  pd.read_csv('./nvs_sem_train.txt',header = None).iloc[:,0]
+val_scenes = pd.read_csv('./newval.txt',header = None).iloc[:,0]
+test_scenes =  pd.read_csv('./newtest.txt',header = None).iloc[:,0]
+train_scenes = original_train.loc[np.logical_and(np.logical_not(original_train.isin(val_scenes)),np.logical_not(original_train.isin(test_scenes)))]
+print(train_scenes.shape[0],print(original_train.shape[0]))
 # def data_generator():
 i = 0
 sfs = []
 rgbs = []
 all_frames = pd.Series(sorted(glob('/home/motion/data/scannet_pp/data/**/gt_semantics/*.png',recursive = True)))
 scene_names = all_frames.str.split('/',expand = True).iloc[:,-4]
-train_semantic_images = all_frames.loc[scene_names.isin(train_scenes.iloc[:,0])]
-val_semantic_images = all_frames.loc[scene_names.isin(val_scenes.iloc[:,0])]
-
+train_semantic_images = all_frames.loc[scene_names.isin(train_scenes.iloc[:])]
+val_semantic_images = all_frames.loc[scene_names.isin(val_scenes.iloc[:])]
 
 
 def verify_all_data_and_create_dataset(semantic_frames):
@@ -87,10 +87,10 @@ def verify_this_frame(image_dirs):
         print(e)
         return ['none','none']
         
-# train_dict = verify_all_data_and_create_dataset(train_semantic_images)
-# pickle.dump(train_dict,open('./scannet_pp_train_dict.p','wb'))
-# train_ds = Dataset.from_dict(train_dict)
-# train_ds.save_to_disk('./scannet_pp_finetune_train.hf')
+train_dict = verify_all_data_and_create_dataset(train_semantic_images)
+pickle.dump(train_dict,open('./scannet_pp_train_dict.p','wb'))
+train_ds = Dataset.from_dict(train_dict)
+train_ds.save_to_disk('./scannet_pp_finetune_train.hf')
 
 val_dict = verify_all_data_and_create_dataset(val_semantic_images)
 pickle.dump(val_dict,open('./scannet_pp_val_dict.p','wb'))
