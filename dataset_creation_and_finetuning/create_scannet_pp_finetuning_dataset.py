@@ -63,7 +63,7 @@ def verify_all_data_and_create_dataset(semantic_frames):
 #             i+=1
 #             print(e)
 #             continue
-    all_verified_frames = Parallel(n_jobs = 6,verbose = 9,backend = 'threading')(delayed(verify_this_frame)(image_dirs)for image_dirs in zip(semantic_frames.values,rgb_frames.values))
+    all_verified_frames = Parallel(n_jobs = 16,verbose = 9,backend = 'threading')(delayed(verify_this_frame)(image_dirs)for image_dirs in zip(semantic_frames.values,rgb_frames.values))
     all_verified_frames = np.array(all_verified_frames)
     invalid = all_verified_frames =='none'
     invalid_entries = np.any(invalid,axis = 1)
