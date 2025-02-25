@@ -23,6 +23,7 @@ import torch.nn.functional as F
 
 
 from datasets import IterableDataset,Dataset
+ 
 
 # def data_generator():
 #     i = 0
@@ -44,12 +45,13 @@ N_CLASSES = 101
 # ds = IterableDataset.from_generator(data_generator)
 
 
-def multiclass_dice_loss(pred, target, smooth=1):
+
+def multiclass_dice_loss(pred, tget, smooth=1):
     """
     Computes Dice Loss for multi-class segmentation. Thanks to https://medium.com/data-scientists-diary/implementation-of-dice-loss-vision-pytorch-7eef1e438f68
     Args:
         pred: Tensor of predictions (batch_size, C, H, W).
-        target: One-hot encoded ground truth (batch_size, C, H, W).
+        target: ground truth (batch_size,H, W).
         smooth: Smoothing factor.
     Returns:
         Scalar Dice Loss.
@@ -58,9 +60,14 @@ def multiclass_dice_loss(pred, target, smooth=1):
     pred = F.softmax(pred, dim=1)  # Convert logits to probabilities
     num_classes = pred.shape[1]  # Number of classes (C)
     dice = 0  # Initialize Dice loss accumulator
-    
+    if(len(tget)!=len(pred.shape)): # if the shapes don't match, the input must be one-hot-encoded
+        target = nn.functional.one_hot(tget,num_classes = num_classes).permute(0,3,1,2)
+    else:
+        target = tget
+
     for c in range(num_classes):  # Loop through each class
         pred_c = pred[:, c]  # Predictions for class c
+
         target_c = target[:, c]  # Ground truth for class c
         
         intersection = (pred_c * target_c).sum(dim=(1, 2))  # Element-wise multiplication
@@ -69,6 +76,7 @@ def multiclass_dice_loss(pred, target, smooth=1):
         dice += (2. * intersection + smooth) / (union + smooth)  # Per-class Dice score
 
     return 1 - dice.mean() / num_classes  # Average Dice Loss across classes
+
 
 
 
@@ -120,7 +128,10 @@ train_ds_dir = './scannet_pp_finetune_train.hf'
 val_ds_dir = './scannet_pp_finetune_val.hf'
 
 train_ds = Dataset.load_from_disk(train_ds_dir)
+train_ds = train_ds.select(np.arange(0,train_ds.shape[0],10))
 val_ds = Dataset.load_from_disk(val_ds_dir)
+val_ds = val_ds.select(np.arange(0,val_ds.shape[0],10))
+
 
 # ds = Dataset.load_from_disk(huggingface_dataset_dir,keep_in_memory = True)
 # ds = ds
@@ -239,7 +250,7 @@ train_ds = train_ds.shuffle(seed = 32)
 #        7.51061301e+00]).astype(np.float32)
 
 # set of weights with laplace smoothing
-weights = np.sqrt(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
+weights = np.log(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
        4.3412052e+01, 3.5001645e+02, 4.4251534e+01, 7.0184227e+01,
        2.6196262e+02, 4.6308620e+01, 5.0304062e+01, 3.4162041e+01,
        5.0358822e+01, 2.5223104e+01, 1.1894136e+02, 1.2442947e+02,
@@ -267,13 +278,14 @@ weights = np.sqrt(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.04030
        7.5106130e+00])).astype(np.float32)
 
 epochs = 10000
-lr = 0.0001
-batch_size = 500
+lr = 0.001
+# batch_size = 50000
+batch_size = 20
 
-hub_model_id = "finetuned ScanNetpp"
+hub_model_id = "finetuned ScanNetpp - sqrt weights - huge batch"
 
 training_args = TrainingArguments(
-    "ScanNet Finetuned SegFormer - with soft-DICE",
+    "ScanNet Finetuned SegFormer DICE all weights high lr loss",
     learning_rate=lr,
     num_train_epochs=epochs,
     per_device_train_batch_size=batch_size,
@@ -281,29 +293,32 @@ training_args = TrainingArguments(
     save_total_limit=3,
     evaluation_strategy="steps",
     save_strategy="steps",
-    save_steps=200,
-    eval_steps=200,
+    save_steps=500,
+    eval_steps=500,
     logging_steps=1,
     eval_accumulation_steps=1,
-    gradient_accumulation_steps = 1,
+    gradient_accumulation_steps = 2,
     load_best_model_at_end=True,
-    metric_for_best_model='mean_iou',
+    metric_for_best_model='loss',
     dataloader_num_workers = 8,
-    fp16 = False
+    batch_eval_metrics = True
+    fp16 = True
     # lr_scheduler_type = 'reduce_lr_on_plateau',
 )
 
 metric = evaluate.load("mean_iou")
 
-def compute_metrics(eval_pred):
+def compute_metrics(eval_pred,compute_result):
 
     start = time.time()
+    import pdb
     with torch.no_grad():
         
-        logits, labels = eval_pred
+        logits_tensor, labels = eval_pred
+        # pdb.set_trace()
         # labels[labels == 255] = N_CLASSES-1
 
-        logits_tensor = torch.from_numpy(logits)
+        # logits_tensor = torch.from_numpy(logits)
 #         print(logits_tensor.size())
         # scale the logits to the size of the label
         logits_tensor = nn.functional.interpolate(
@@ -312,29 +327,31 @@ def compute_metrics(eval_pred):
             mode="bilinear",
             align_corners=False,
         ).argmax(dim=1)
-
         pred_labels = logits_tensor.detach().cpu().numpy()
-        label = labels
+        label = labels.cpu().numpy()
         # currently using _compute instead of compute
         # see this issue for more info: https://github.com/huggingface/evaluate/pull/328#issuecomment-1286866576
-        metrics = metric._compute(
-                predictions=pred_labels,
-                references=labels,
-                num_labels=N_CLASSES,
-                ignore_index=False,
-                reduce_labels=feature_extractor.do_reduce_labels,
-            )
+        if(not compute_result):
+            metrics = metric.add_batch(
+                    predictions=pred_labels,
+                    references=labels,
+                )
+            return {}
+        else:
+            metrics = metric.compute(num_labels=N_CLASSES,
+                    ignore_index=False,
+                    reduce_labels=feature_extractor.do_reduce_labels)
 
         # add per category metrics as individual key-value pairs
-        per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
-        per_category_iou = metrics.pop("per_category_iou").tolist()
+            per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
+            per_category_iou = metrics.pop("per_category_iou").tolist()
 
-        metrics.update({f"accuracy_{i}": v for i, v in enumerate(per_category_accuracy)})
-        metrics.update({f"iou_{i}": v for i, v in enumerate(per_category_iou)})
-        print('metric calculations took {}'.format(time.time()-start))
+            metrics.update({f"accuracy_{i}": v for i, v in enumerate(per_category_accuracy)})
+            metrics.update({f"iou_{i}": v for i, v in enumerate(per_category_iou)})
+            print('metric calculations took {}'.format(time.time()-start))
         return metrics
-
-early_stop = EarlyStoppingCallback(150,0.0005)
+    
+early_stop = EarlyStoppingCallback(10,0.0005)
 
 
 class CustomTrainer(Trainer):
