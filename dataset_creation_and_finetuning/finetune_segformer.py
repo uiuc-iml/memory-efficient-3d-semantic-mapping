@@ -79,14 +79,19 @@ def multiclass_dice_loss(pred, tget, smooth=1):
 
 
 
-
-def load_images(rgb,semantic,):
+def load_images(rgb,semantic):
     # import pdb
     # pdb.set_trace()
-    tmp = cv2.imread(semantic[0],cv2.IMREAD_UNCHANGED).astype(np.uint8)
-    tmp2 = cv2.imread(rgb[0]).astype(np.uint8)
-    tmp2 = np.moveaxis(tmp2,[0,1,2],[1,2,0])
-    return tmp2,tmp
+    rgb_batch = []
+    sem_batch = []
+    for sem,color in zip(rgb,semantic):
+        tmp = cv2.imread(semantic[0],cv2.IMREAD_UNCHANGED).astype(np.uint8)
+        tmp2 = cv2.imread(rgb[0]).astype(np.uint8)
+        tmp2 = np.moveaxis(tmp2,[0,1,2],[1,2,0])
+        rgb_batch.append(tmp2)
+        sem_batch.append(tmp)
+    return rgb_batch,sem_batch
+
 
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -100,7 +105,7 @@ model =  SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b4-f
 
 model.train()
 for param in model.parameters():
-    param.requires_grad = False
+    param.requires_grad = True
 decoder_head = model.decode_head
 decoder_head.classifier = nn.Conv2d(768,N_CLASSES,kernel_size=(1, 1), stride=(1, 1))
 for param in decoder_head.parameters():
@@ -128,9 +133,9 @@ train_ds_dir = './scannet_pp_finetune_train.hf'
 val_ds_dir = './scannet_pp_finetune_val.hf'
 
 train_ds = Dataset.load_from_disk(train_ds_dir)
-train_ds = train_ds.select(np.arange(0,train_ds.shape[0],10))
+# train_ds = train_ds.select(np.arange(0,train_ds.shape[0],10))
 val_ds = Dataset.load_from_disk(val_ds_dir)
-val_ds = val_ds.select(np.arange(0,val_ds.shape[0],10))
+val_ds = val_ds.select(np.arange(0,val_ds.shape[0]))
 
 
 # ds = Dataset.load_from_disk(huggingface_dataset_dir,keep_in_memory = True)
@@ -250,7 +255,7 @@ train_ds = train_ds.shuffle(seed = 32)
 #        7.51061301e+00]).astype(np.float32)
 
 # set of weights with laplace smoothing
-weights = np.log(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
+weights = np.abs(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
        4.3412052e+01, 3.5001645e+02, 4.4251534e+01, 7.0184227e+01,
        2.6196262e+02, 4.6308620e+01, 5.0304062e+01, 3.4162041e+01,
        5.0358822e+01, 2.5223104e+01, 1.1894136e+02, 1.2442947e+02,
@@ -285,7 +290,7 @@ batch_size = 20
 hub_model_id = "finetuned ScanNetpp - sqrt weights - huge batch"
 
 training_args = TrainingArguments(
-    "ScanNet Finetuned SegFormer DICE all weights high lr loss",
+    "ScanNet Finetuned SegFormer DICE no skip no sqrt all weights",
     learning_rate=lr,
     num_train_epochs=epochs,
     per_device_train_batch_size=batch_size,
@@ -293,15 +298,15 @@ training_args = TrainingArguments(
     save_total_limit=3,
     evaluation_strategy="steps",
     save_strategy="steps",
-    save_steps=500,
-    eval_steps=500,
+    save_steps=200,
+    eval_steps=200,
     logging_steps=1,
     eval_accumulation_steps=1,
     gradient_accumulation_steps = 2,
     load_best_model_at_end=True,
     metric_for_best_model='loss',
     dataloader_num_workers = 8,
-    batch_eval_metrics = True
+    batch_eval_metrics = True,
     fp16 = True
     # lr_scheduler_type = 'reduce_lr_on_plateau',
 )
