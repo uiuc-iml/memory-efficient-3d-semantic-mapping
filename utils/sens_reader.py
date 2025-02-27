@@ -19,6 +19,8 @@ import yaml
 import klampt
 from klampt.math import se3
 from klampt.math import so3
+from utils.colmap import read_model
+import re
 
 
 
@@ -38,17 +40,71 @@ def unzip(zip_path, zip_type,scene_name):
     return os.path.join(target_dir, zip_type)
 
 
+# class ScanNetPPReader(Dataset):
+#     def __init__(self,root_dir,scene_name):
+#         self.scene = scene_name
+#         self.root_dir = root_dir
+#         self.parent_dir = root_dir+'/data/{}/iphone'.format(scene_name)
+#         self.depth_image_files = sorted(glob(self.parent_dir+'/depth/*.png'))
+#         self.rgb_image_files =  sorted(glob(self.parent_dir+'/rgb/*.jpg'))
+#         with open(self.parent_dir + '/pose_intrinsic_imu.json','r') as f:
+#             self.poses_dict = json.load(f)
+#         self.poses_key = list(self.poses_dict.keys())
+#         self.size = len(self.depth_image_files)
+        
+#     def __getitem__(self,key):
+#         depth_dir = self.depth_image_files[key]
+#         rgb_dir = self.rgb_image_files[key]
+#         pose_key = self.poses_key[key]
+#         depth = cv2.imread(depth_dir,cv2.IMREAD_UNCHANGED)
+#         rgb = cv2.imread(rgb_dir,cv2.IMREAD_UNCHANGED)
+#         rgb = cv2.resize(rgb,(0,0),fx = 1/7.5,fy = 1/7.5)
+#         aligned_pose = np.array(self.poses_dict[pose_key]['aligned_pose'])
+#         intrinsic = np.array(self.poses_dict[pose_key]['intrinsic'])
+#         intrinsic[:2,:3] = intrinsic[:2,:3]/7.5
+#         return {
+#             'color': rgb,
+#             'depth': depth,
+#             'pose': aligned_pose,
+#             'intrinsics_depth':intrinsic
+#         }
+
+#     def __len__(self):
+#         return self.size
+
 class ScanNetPPReader(Dataset):
     def __init__(self,root_dir,scene_name):
         self.scene = scene_name
         self.root_dir = root_dir
         self.parent_dir = root_dir+'/data/{}/iphone'.format(scene_name)
-        self.depth_image_files = sorted(glob(self.parent_dir+'/depth/*.png'))
-        self.rgb_image_files =  sorted(glob(self.parent_dir+'/rgb/*.jpg'))
-        with open(self.parent_dir + '/pose_intrinsic_imu.json','r') as f:
-            self.poses_dict = json.load(f)
+        # self.depth_dir = root
+        import pdb
+        # self.depth_image_files = sorted(glob(self.parent_dir+'/render_depth/*.png'))
+        self.depth_image_files = sorted(glob(self.parent_dir+'/render_depth/*.png'))
+        images_txt_path = os.path.join(self.parent_dir, 'colmap', 'images.txt')
+        self.frame_indices = self.extract_frame_indices(images_txt_path)
+
+        # self.rgb_image_files =  sorted(glob(self.parent_dir+'/rgb/*.jpg'))[self.frame_indices]
+        all_rgb_files = sorted(glob(os.path.join(self.parent_dir, 'rgb', '*.jpg')))
+        # self.rgb_image_files = [all_rgb_files[i] for i in self.frame_indices if i < len(all_rgb_files)]
+        self.rgb_image_files = [os.path.join(self.parent_dir, 'rgb', f'frame_{i:06d}.jpg') for i in self.frame_indices]
+
+
+        cameras, images, points3D = read_model(self.parent_dir + '/colmap', ".txt")        # with open(self.parent_dir + '/pose_intrinsic_imu.json','r') as f:
+        fx, fy, cx, cy = cameras[1].params[:4]
+        intrinsic_matrix = np.eye(3)
+        intrinsic_matrix[0,0] = fx
+        intrinsic_matrix[1,1] = fy
+        intrinsic_matrix[:2,2] = [cx,cy]
+        self.poses_dict = {}
+        for image_id, image in images.items():
+            self.poses_dict.update({image.name.split('.')[0]:{'pose':np.linalg.inv(image.world_to_camera),'intrinsic':intrinsic_matrix}})
+        # pdb.set_trace()
+
+        #     self.poses_dict = json.load(f)
         self.poses_key = list(self.poses_dict.keys())
         self.size = len(self.depth_image_files)
+        # self.size = len(self.rgb_image_files)
         
     def __getitem__(self,key):
         depth_dir = self.depth_image_files[key]
@@ -56,10 +112,20 @@ class ScanNetPPReader(Dataset):
         pose_key = self.poses_key[key]
         depth = cv2.imread(depth_dir,cv2.IMREAD_UNCHANGED)
         rgb = cv2.imread(rgb_dir,cv2.IMREAD_UNCHANGED)
-        rgb = cv2.resize(rgb,(0,0),fx = 1/7.5,fy = 1/7.5)
-        aligned_pose = np.array(self.poses_dict[pose_key]['aligned_pose'])
+        
+        new_size = (int(rgb.shape[1] * 0.15), int(rgb.shape[0] * 0.15))
+        depth = cv2.resize(depth, new_size, interpolation=cv2.INTER_NEAREST)
+        rgb = cv2.resize(rgb, new_size, interpolation=cv2.INTER_LINEAR)
+        # print(depth.shape)
+        # print(rgb.shape)
+        # rgb = cv2.resize(rgb,(0,0),fx = 1/7.5,fy = 1/7.5)
+        # aligned_pose = np.array(self.poses_dict[pose_key]['aligned_pose'])
+        aligned_pose = np.array(self.poses_dict[pose_key]['pose'])
+        
         intrinsic = np.array(self.poses_dict[pose_key]['intrinsic'])
-        intrinsic[:2,:3] = intrinsic[:2,:3]/7.5
+        intrinsic[:2, :] *= 0.15
+
+        # intrinsic[:2,:3] = intrinsic[:2,:3]/7.5
         return {
             'color': rgb,
             'depth': depth,
@@ -69,6 +135,21 @@ class ScanNetPPReader(Dataset):
 
     def __len__(self):
         return self.size
+    
+    def extract_frame_indices(self, images_txt_path):
+        """Extracts frame numbers from images.txt"""
+        frame_numbers = []
+        if os.path.exists(images_txt_path):
+            with open(images_txt_path, "r") as file:
+                for line in file:
+                    if line.strip() and not line.startswith("#"):
+                        parts = line.strip().split()
+                        if len(parts) >= 10:
+                            match = re.search(r"frame_(\d+).jpg", parts[-1])
+                            if match:
+                                frame_numbers.append(int(match.group(1)))
+        return sorted(frame_numbers)
+
 
 class BS3D_reader(Dataset):
     def __init__(self,root_dir):

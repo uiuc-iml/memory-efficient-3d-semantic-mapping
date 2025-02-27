@@ -20,11 +20,25 @@ import time
 
 import torch
 import torch.nn.functional as F
-
+import argparse
+from multiprocessing import Lock
 
 from datasets import IterableDataset,Dataset
- 
 
+parser = argparse.ArgumentParser()
+
+
+parser.add_argument('--parallel',action='store_true',help ='whether this model should be trained in parallel')
+parser.add_argument('--loss_weights',default = 'sqrt',help = 'how to scale the loss weights per class')
+parser.add_argument('--lr',default = 0.001,type = float, help = 'the learning rate for training the model')
+parser.add_argument('--gpu',default = 'A100', help = 'the GPU used for training')
+
+args = parser.parse_args()
+
+parallel = args.parallel
+loss_weights = args.loss_weights
+lr = args.lr
+gpu = args.gpu
 # def data_generator():
 #     i = 0
 #     semantic_frames = pd.Series(sorted(glob('/home/motion/data/scannet_pp/data/**/*.png',recursive = True)))
@@ -43,6 +57,46 @@ from datasets import IterableDataset,Dataset
 N_CLASSES = 101
 
 # ds = IterableDataset.from_generator(data_generator)
+
+class Cumulative_mIoU_torch:
+    def __init__(self,n_classes):
+        self.n_classes = n_classes
+        self.reset_counts()
+    
+    def reset_counts(self):
+        self.intersections = torch.from_numpy(np.zeros(self.n_classes)).long().to('cuda:0')
+        self.unions = torch.from_numpy(np.zeros(self.n_classes)).long().to('cuda:0')
+        self.all_preds =  torch.from_numpy(np.zeros(self.n_classes)).long().to('cuda:0')
+        self.all_gts = torch.from_numpy(np.zeros(self.n_classes)).long().to('cuda:0')
+        self.lock = Lock()
+    def update_counts(self,pred,gt):
+        with self.lock:
+            with torch.no_grad():
+                self.intersections = self.intersections.to(pred.device)
+                self.unions = self.unions.to(pred.device)
+                self.all_gts = self.all_gts.to(pred.device)
+                self.all_preds = self.all_preds.to(pred.device)
+                gt = gt.to(pred.device)
+                for i in range(self.n_classes):
+                    gt_mask = torch.eq(gt.long(),i)
+                    pred_mask = torch.eq(pred.long(),i)
+                    self.intersections[i] += torch.logical_and(gt_mask,pred_mask).sum()
+                    self.unions[i] += torch.logical_or(gt_mask,pred_mask).sum()
+                    self.all_preds[i] += pred_mask.sum()
+                    self.all_gts[i] += gt_mask.sum()
+
+    def get_IoUs(self):
+        res = self.intersections.cpu().numpy()/self.unions.cpu().numpy()
+        # res[np.logical_not(np.isfinite(res))] = 0
+        return res
+    def get_precision(self):
+        res = self.intersections.cpu().numpy()/self.all_preds.cpu().numpy()
+        # res[np.logical_not(np.isfinite(res))] = 0
+        return res
+    def get_recall(self):
+        res = self.intersections.cpu().numpy()/self.all_gts.cpu().numpy()
+        # res[np.logical_not(np.isfinite(res))] = 0
+        return res
 
 
 
@@ -75,7 +129,7 @@ def multiclass_dice_loss(pred, tget, smooth=1):
         
         dice += (2. * intersection + smooth) / (union + smooth)  # Per-class Dice score
 
-    return 1 - dice.mean() / num_classes  # Average Dice Loss across classes
+    return (1 - dice.mean() / num_classes).contiguous()  # Average Dice Loss across classes
 
 
 
@@ -87,7 +141,7 @@ def load_images(rgb,semantic):
     for sem,color in zip(rgb,semantic):
         tmp = cv2.imread(semantic[0],cv2.IMREAD_UNCHANGED).astype(np.uint8)
         tmp2 = cv2.imread(rgb[0]).astype(np.uint8)
-        tmp2 = np.moveaxis(tmp2,[0,1,2],[1,2,0])
+        tmp2 = np.ascontiguousarray(np.moveaxis(tmp2,[0,1,2],[1,2,0]))
         rgb_batch.append(tmp2)
         sem_batch.append(tmp)
     return rgb_batch,sem_batch
@@ -105,13 +159,17 @@ model =  SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b4-f
 
 model.train()
 for param in model.parameters():
-    param.requires_grad = True
+    param.requires_grad = False
 decoder_head = model.decode_head
 decoder_head.classifier = nn.Conv2d(768,N_CLASSES,kernel_size=(1, 1), stride=(1, 1))
 for param in decoder_head.parameters():
     param.requires_grad = True
 
 model.to(device)
+
+# if(parallel):
+#     from accelerate import Accelerator
+
 # classes = ['irrelevant','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
 #            'counter','desk','curtain','refridgerator','shower curtain','toilet','sink','bathtub','otherfurniture']
 # id2label = {}
@@ -133,9 +191,9 @@ train_ds_dir = './scannet_pp_finetune_train.hf'
 val_ds_dir = './scannet_pp_finetune_val.hf'
 
 train_ds = Dataset.load_from_disk(train_ds_dir)
-# train_ds = train_ds.select(np.arange(0,train_ds.shape[0],10))
+train_ds = train_ds.select(np.arange(0,train_ds.shape[0],10))
 val_ds = Dataset.load_from_disk(val_ds_dir)
-val_ds = val_ds.select(np.arange(0,val_ds.shape[0]))
+val_ds = val_ds.select(np.arange(0,val_ds.shape[0],10))
 
 
 # ds = Dataset.load_from_disk(huggingface_dataset_dir,keep_in_memory = True)
@@ -255,7 +313,12 @@ train_ds = train_ds.shuffle(seed = 32)
 #        7.51061301e+00]).astype(np.float32)
 
 # set of weights with laplace smoothing
-weights = np.abs(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
+
+ops = {'sqrt':np.sqrt,'log':np.log,'abs':np.abs}
+
+op = ops.get(loss_weights,np.abs)
+
+weights = op(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+01,
        4.3412052e+01, 3.5001645e+02, 4.4251534e+01, 7.0184227e+01,
        2.6196262e+02, 4.6308620e+01, 5.0304062e+01, 3.4162041e+01,
        5.0358822e+01, 2.5223104e+01, 1.1894136e+02, 1.2442947e+02,
@@ -283,14 +346,45 @@ weights = np.abs(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.040301
        7.5106130e+00])).astype(np.float32)
 
 epochs = 10000
-lr = 0.001
+# lr = 0.001
 # batch_size = 50000
 batch_size = 20
 
-hub_model_id = "finetuned ScanNetpp - sqrt weights - huge batch"
+if(parallel):
+    model_name = "ScanNet Finetuned SegFormer DICE - validation subsample multi-gpu {} - LR {:.2e} - {}".format(loss_weights,lr,gpu)
+else:
+    model_name = "ScanNet Finetuned SegFormer DICE - validation subsample {} LR {:.2e} - {}".format(loss_weights,lr,gpu)
 
-training_args = TrainingArguments(
-    "ScanNet Finetuned SegFormer DICE no skip no sqrt all weights",
+model_name = model_name.replace('.','_')
+
+hub_model_id = model_name
+
+if(not parallel):
+    training_args = TrainingArguments(
+        model_name,
+        learning_rate=lr,
+        num_train_epochs=epochs,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        save_total_limit=3,
+        evaluation_strategy="steps",
+        save_strategy="steps",
+        save_steps=400,
+        eval_steps=400,
+        logging_steps=1,
+        eval_accumulation_steps=1,
+        gradient_accumulation_steps = 2,
+        load_best_model_at_end=True,
+        metric_for_best_model='loss',
+        dataloader_num_workers = 8,
+        batch_eval_metrics = True,
+        fp16 = True,
+        dataloader_pin_memory=True,
+        # lr_scheduler_type = 'reduce_lr_on_plateau',
+    )
+else:
+    training_args = TrainingArguments(
+    model_name,
     learning_rate=lr,
     num_train_epochs=epochs,
     per_device_train_batch_size=batch_size,
@@ -298,8 +392,8 @@ training_args = TrainingArguments(
     save_total_limit=3,
     evaluation_strategy="steps",
     save_strategy="steps",
-    save_steps=200,
-    eval_steps=200,
+    save_steps=100,
+    eval_steps=100,
     logging_steps=1,
     eval_accumulation_steps=1,
     gradient_accumulation_steps = 2,
@@ -307,56 +401,65 @@ training_args = TrainingArguments(
     metric_for_best_model='loss',
     dataloader_num_workers = 8,
     batch_eval_metrics = True,
-    fp16 = True
-    # lr_scheduler_type = 'reduce_lr_on_plateau',
-)
+    fp16 = True,
+    local_rank=-1,  # This will be automatically set when launching with torchrun
+    ddp_backend="nccl",
+    dataloader_pin_memory=True,
+    )
 
-metric = evaluate.load("mean_iou")
 
-def compute_metrics(eval_pred,compute_result):
+# metric = evaluate.load("mean_iou")
 
-    start = time.time()
-    import pdb
-    with torch.no_grad():
-        
-        logits_tensor, labels = eval_pred
-        # pdb.set_trace()
-        # labels[labels == 255] = N_CLASSES-1
+class MetricComputer:
+    def __init__(self,n_classes = 101):
+        self.n_classes = n_classes
+        self.miou_calc = Cumulative_mIoU_torch(n_classes = self.n_classes)
 
-        # logits_tensor = torch.from_numpy(logits)
-#         print(logits_tensor.size())
-        # scale the logits to the size of the label
-        logits_tensor = nn.functional.interpolate(
-            logits_tensor,
-            size=labels.shape[-2:],
-            mode="bilinear",
-            align_corners=False,
-        ).argmax(dim=1)
-        pred_labels = logits_tensor.detach().cpu().numpy()
-        label = labels.cpu().numpy()
-        # currently using _compute instead of compute
-        # see this issue for more info: https://github.com/huggingface/evaluate/pull/328#issuecomment-1286866576
-        if(not compute_result):
-            metrics = metric.add_batch(
-                    predictions=pred_labels,
-                    references=labels,
-                )
-            return {}
-        else:
-            metrics = metric.compute(num_labels=N_CLASSES,
-                    ignore_index=False,
-                    reduce_labels=feature_extractor.do_reduce_labels)
+    def compute_metrics(self,eval_pred,compute_result):
+        with torch.no_grad():
+            
+            logits_tensor, labels = eval_pred
+            # pdb.set_trace()
+            # labels[labels == 255] = N_CLASSES-1
 
-        # add per category metrics as individual key-value pairs
-            per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
-            per_category_iou = metrics.pop("per_category_iou").tolist()
+            # logits_tensor = torch.from_numpy(logits)
+    #         print(logits_tensor.size())
+            # scale the logits to the size of the label
+            logits_tensor = nn.functional.interpolate(
+                logits_tensor,
+                size=labels.shape[-2:],
+                mode="bilinear",
+                align_corners=False,
+            ).argmax(dim=1)
+            pred_labels = logits_tensor.detach()
+            label = labels
+            # currently using _compute instead of compute
+            # see this issue for more info: https://github.com/huggingface/evaluate/pull/328#issuecomment-1286866576
+            if(not compute_result):
+                # metrics = metric.add_batch(
+                #         predictions=pred_labels,
+                #         references=labels,
+                #     )
+                self.miou_calc.update_counts(pred_labels.flatten(),gt = label.flatten())
+                return {}
+            else:
+                metrics = {}
+                per_category_iou = self.miou_calc.get_IoUs()
+                metrics.update({f"iou_{i}": v for i, v in enumerate(per_category_iou)})
 
-            metrics.update({f"accuracy_{i}": v for i, v in enumerate(per_category_accuracy)})
-            metrics.update({f"iou_{i}": v for i, v in enumerate(per_category_iou)})
-            print('metric calculations took {}'.format(time.time()-start))
-        return metrics
+                per_category_iou[np.logical_not(np.isfinite(per_category_iou))] = 0
+                metrics.update({'mean_iou':np.mean(per_category_iou)})
+
+                per_category_recall = self.miou_calc.get_recall()
+                metrics.update({f"recall_{i}": v for i, v in enumerate(per_category_recall)})
+
+                per_category_precision = self.miou_calc.get_precision()
+                metrics.update({f"precision_{i}": v for i, v in enumerate(per_category_precision)})
+                self.miou_calc.reset_counts()
+
+            return metrics
     
-early_stop = EarlyStoppingCallback(10,0.0005)
+early_stop = EarlyStoppingCallback(50,0.0005)
 
 
 class CustomTrainer(Trainer):
@@ -371,7 +474,7 @@ class CustomTrainer(Trainer):
             size=labels.shape[-2:],
             mode="bilinear",
             align_corners=False,
-        )
+        ).contiguous()
         # compute custom loss
         # pdb.set_trace()
 
@@ -379,13 +482,15 @@ class CustomTrainer(Trainer):
         # pdb.set_trace()
         loss = loss_fct(logits, labels) + multiclass_dice_loss(logits,labels)
         return (loss, outputs) if return_outputs else loss
-    
+
+metrics_calculator = MetricComputer(n_classes = N_CLASSES)
+
 trainer = CustomTrainer(
     model=model,
     args=training_args,
     train_dataset=train_ds,
     eval_dataset=val_ds,
-    compute_metrics=compute_metrics,
+    compute_metrics=metrics_calculator.compute_metrics,
     callbacks=[early_stop]
 )
 
@@ -393,6 +498,6 @@ trainer = CustomTrainer(
 trainer.train()
 
 #saving the trained model to the best_model directory
-trainer.save_model("./segmentation_model_checkpoints/Segformer")
+trainer.save_model("./segmentation_model_checkpoints/{}".format(model_name))
 
 

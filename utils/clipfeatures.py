@@ -1,9 +1,9 @@
 from PIL import Image
 import torch
 import numpy as np
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator  # Import the generator
+# from segment_anything import sam_model_registry, SamAutomaticMaskGenerator  # Import the generator
 import cv2  # For color manipulation
-import open_clip
+# import open_clip
 from copy import deepcopy
 
 # class ClipFeatureExtractor():

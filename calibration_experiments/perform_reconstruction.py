@@ -9,11 +9,11 @@ import pickle
 import sys
 import traceback
 from functools import partial
-from tkinter import E
+# from tkinter import E
 import psutil
 import time
 import torch
-import nvidia_smi
+# import nvidia_smi
 
 import cv2
 
@@ -45,11 +45,11 @@ processes = 1
 
 
 
-def get_gpu_memory_usage():
-    nvidia_smi.nvmlInit()
-    handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-    info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-    return (info.used/(1024 ** 3))
+# def get_gpu_memory_usage():
+#     nvidia_smi.nvmlInit()
+#     handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+#     info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+#     return (info.used/(1024 ** 3))
 
 def save_plot(data, ylabel, title, filename):
     plt.figure()
@@ -69,7 +69,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
     gpu_memory_usage = []
     # peak_memory_usage = []
     # # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-    arr_des = '/home/motion/semanticmapping/visuals/arrays/{}/cacherelease'.format(scene)
+    arr_des = '/work/hdd/bebg/results/visuals/{}/'.format(scene)
     # # plot_dir = os.path.join(des, 'topk')
     arr_dir = os.path.join(arr_des, f'{experiment_name}')
     if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
@@ -108,7 +108,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
         k1 = experiment_settings['k']
         savedir = "{}/{}/".format(fnames['results_dir'], f'{experiment_name}{k}')
     
-
+    
     # savedir = '/scratch/bbuq/jcorreiamarques/3d_calibration/Results/{}/'.format(experiment_name)
     if(not os.path.exists(savedir)):
         try:
@@ -129,7 +129,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
     try:
         device = o3d.core.Device('CUDA:0')
 
-
+        
 
         # my_ds = scannet_scene_reader(root_dir, scene ,lim = lim,disable_tqdm = True)
         my_ds = ScanNetPPReader(root_dir, scene)
@@ -140,9 +140,10 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
         randomized_indices = np.array(list(range(lim)))
         np.random.seed(0)
         proc_num = multiprocessing.current_process()._identity[0]%(processes+1) + 1
+        print(f"total_len: {total_len}")
         for idx,i in tqdm(enumerate(randomized_indices),total = lim,desc = 'proc {}'.format(proc_num),position = proc_num):
             # start_time = time.time()
-            
+            # print("here2")
             try:
                 data_dict = my_ds[i]
             except:
@@ -165,7 +166,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
             # segmentation_end_time = time.time()
             # print(segmentation_end_time - segmentation_start_time)
             # segmentation_times.append(segmentation_end_time - segmentation_start_time)
-
+            
             reconstruction_start_time = time.time()
 
             if(oracle):
@@ -181,9 +182,9 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
             # combined_times.append(reconstruction_end_time - segmentation_start_time)
             # end_time = time.time()
             # iteration_times.append(end_time - start_time)
-            gpu_memory_usage.append(get_gpu_memory_usage())
-            gpu_memory_usage_np = np.array(gpu_memory_usage)
-            np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
+            # gpu_memory_usage.append(get_gpu_memory_usage())
+            # gpu_memory_usage_np = np.array(gpu_memory_usage)
+            # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
             reconstruction_times_np = np.array(reconstruction_times)
             np.save(os.path.join(arr_dir, "reconstruction_times.npy"), reconstruction_times_np)
             del intrinsic

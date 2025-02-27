@@ -1,8 +1,8 @@
 {
-"results_dir":"/home/motion/semanticmapping/results/scannetpp",
-"results_bs3d_dir":"/home/motion/semanticmapping/results/bs3d",
+"results_dir":"/work/hdd/bebg/results/scannetpp",
+"results_bs3d_dir":"/work/hdd/bebg/results/bs3d",
 "ScanNet_root_dir":"/home/motion/Data/scannet_v2",
-"ScanNetpp_root_dir":"/home/motion/extra_storage/scannet_pp",
+"ScanNetpp_root_dir":"/work/hdd/bebg/data/scannet_pp",
 "finetune_dir":"",
 "h5py_dataset_dir":"/home/motion/extra_storage/h5pydataset",
 "singleton_dataset_dir":"/home/motion/extra_storage/singleton_dataset",

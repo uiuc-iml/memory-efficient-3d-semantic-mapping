@@ -16,7 +16,7 @@ import torch.utils.dlpack
 from torch import linalg as LA
 import torch.nn as nn
 import os
-import nvidia_smi
+# import nvidia_smi
 
 
 
@@ -739,18 +739,156 @@ class topkhist(Reconstruction):
             (o3c.float32, o3c.float32), ((1), (1)),
             self.voxel_size,self.res, 17500, self.device)
 
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene=None):
+        k = self.k
+        # arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease/Maskformer topk{k}'
+        # # plot_dir = os.path.join(des, 'topk')
+        # # arr_dir = os.path.join(arr_des, '4')
+        # arr_dir = arr_des
+        # # if not os.path.exists(plot_dir):
+        # #     os.makedirs(plot_dir)
+        # if not os.path.exists(arr_dir):
+        #     os.makedirs(arr_dir)
+        # try:
+        #     a_b1 = self.vbg.hashmap()
+        #     a_b = a_b1.active_buf_indices()
+        #     self.block_count.append(len(a_b))
+        #     block_count_np = np.array(self.block_count)
+        #     np.save(os.path.join(arr_dir, "block_count.npy"), block_count_np)
+        #     hs = a_b1.size()
+        #     self.hashmap_size.append(hs)
+        #     hashmap_size_np = np.array(self.hashmap_size)
+        #     np.save(os.path.join(arr_dir, "hashmap_size.npy"), hashmap_size_np)
+        #     tb = a_b1.capacity()
+        #     self.total_blocks.append(tb)
+        #     total_blocks_np = np.array(self.total_blocks)
+        #     np.save(os.path.join(arr_dir, "total_blocks.npy"), total_blocks_np)
+
+        #     # print(b_c)
+        # except Exception as e:
+        #     print(e)
+
+        semantic_label = np.argmax(semantic_label, axis=2)
+        semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
+        
+        semantic_readings = semantic_image.as_tensor()[v_proj, u_proj].to(o3c.int64)
+
+        topk_open3d = self.vbg.attribute('topkclassesandfreq').reshape((-1, (2 * k) + 1))
+        topk = torch.utils.dlpack.from_dlpack(topk_open3d.to_dlpack())
+
+        # get the semantic labels for valid voxels.
+        topsemanticlabel = semantic_readings[mask_inlier].flatten()
+        topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
+        valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
+
+        topk[valid_voxel_indices_torch, 2 * k] += 1
+
+        # Extract current top-k labels 
+        ntopk = topk[valid_voxel_indices_torch, 0:2 * k:2]
+        # Create a match mask: each row compares the observed label to each stored label.
+        match_mask = (ntopk == topsemanticlabel_torch.reshape(-1, 1))
+        # print(match_mask.shape)
+        # has_match is a boolean tensor (one per voxel) indicating if there is any match.
+        has_match = torch.any(match_mask, dim=1)
+
+        if has_match.any():
+            # For each voxel with a match, update exactly one head count.
+            match_rows = valid_voxel_indices_torch[has_match]
+            # get the first match index.
+            first_match_idx = torch.argmax(match_mask[has_match].to(torch.int32), dim=1)
+            # Compute the column index in topk corresponding to the count slot: 2*first_match_idx + 1.
+            head_count_cols = 2 * first_match_idx + 1
+            topk[match_rows, head_count_cols] += 1
+
+        # For voxels with no match 
+        no_match = ~has_match
+        no_match_indices = valid_voxel_indices_torch[no_match]
+        no_match_labels = topsemanticlabel_torch[no_match]
+
+        # -1 as the placeholder for an empty slot
+        empty_placeholder = -1  
+        # Identify empty slots among the k stored labels for these voxels
+        empty_slots_mask = (topk[no_match_indices, 0:2 * k:2] == empty_placeholder)
+        has_empty_slot = torch.any(empty_slots_mask, dim=1)
+
+        if has_empty_slot.any():
+            # For voxels with an empty slot, update the first available empty slot
+            voxels_with_empty = no_match_indices[has_empty_slot]
+            empty_mask = empty_slots_mask[has_empty_slot]
+            first_empty_slot = torch.argmax(empty_mask.to(torch.int32), dim=1)
+            # Set the label in the empty slot and initialize its count to 1.
+            topk[voxels_with_empty, 2 * first_empty_slot] = no_match_labels[has_empty_slot].to(torch.int16)
+            topk[voxels_with_empty, 2 * first_empty_slot + 1] = 1
+
+        # For voxels with no match and no empty slot (ie all k slots are occupied):
+        fully_occupied = ~has_empty_slot
+        if fully_occupied.any():
+            fully_occupied_indices = no_match_indices[fully_occupied]
+            # Find the minimum count among the k head slots for these voxels.
+            counts_full = topk[fully_occupied_indices, 1:2 * k:2]
+            min_vals, min_idx = torch.min(counts_full, dim=1)
+            # Decrement the minimum count
+            
+            decrement_cols = 2 * min_idx + 1
+            topk[fully_occupied_indices, decrement_cols] -= 1
+            # Remove the class if its count falls to 0 or below by setting the label to -1
+            removal_mask = topk[fully_occupied_indices, decrement_cols] <= 0
+            if removal_mask.any():
+                # Get the indices  among fully occupied voxels that need removal
+                voxels_to_remove = fully_occupied_indices[removal_mask]
+                # Get the corresponding minimal slot indices for these voxels
+                rem_min_idx = min_idx[removal_mask]
+                label_cols = 2 * rem_min_idx
+                count_cols = label_cols + 1
+                # Set the label to (-1) and the count to 0.
+                topk[voxels_to_remove, label_cols] = -1
+                topk[voxels_to_remove, count_cols] = 0
+
+
+        counts = topk[valid_voxel_indices_torch, 1:2 * k:2]
+        labels = topk[valid_voxel_indices_torch, 0:2 * k:2]
+        sorted_indices = torch.argsort(-counts, dim=1)
+        sorted_counts = counts.gather(1, sorted_indices)
+        sorted_labels = labels.gather(1, sorted_indices)
+        topk[valid_voxel_indices_torch, 0:2 * k:2] = sorted_labels
+        topk[valid_voxel_indices_torch, 1:2 * k:2] = sorted_counts
+
+        o3d.core.cuda.synchronize()
+        o3d.core.cuda.release_cache()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
 
     
+
     # def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
 
 
-    #     # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/Segformer topk'
-    #     # # plot_dir = os.path.join(des, 'topk')
-    #     # arr_dir = os.path.join(arr_des, '4')
-    #     # # if not os.path.exists(plot_dir):
-    #     # #     os.makedirs(plot_dir)
-    #     # if not os.path.exists(arr_dir):
-    #     #     os.makedirs(arr_dir)
+
+    #    # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/Segformer topk'
+    #    # # plot_dir = os.path.join(des, 'topk')
+    #    # arr_dir = os.path.join(arr_des, '4')
+    #    # # if not os.path.exists(plot_dir):
+    #    # #     os.makedirs(plot_dir)
+    #    # if not os.path.exists(arr_dir):
+    #    #     os.makedirs(arr_dir)
+    #     # try:
+    #     #     a_b1 = self.vbg.hashmap()
+    #     #     a_b = a_b1.active_buf_indices()
+    #     #     self.block_count.append(len(a_b))
+    #     #     block_count_np = np.array(self.block_count)
+    #     #     np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
+    #     #     hs = a_b1.size()
+    #     #     self.hashmap_size.append(hs)
+    #     #     hashmap_size_np = np.array(self.hashmap_size)
+    #     #     np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
+    #     #     tb = a_b1.capacity()
+    #     #     self.total_blocks.append(tb)
+    #     #     total_blocks_np = np.array(self.total_blocks)
+    #     #     np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
+
+    #     #     # print(b_c)
+    #     # except Exception as e:
+    #     #     print(e)
 
 
 
@@ -758,76 +896,63 @@ class topkhist(Reconstruction):
     #     semantic_label = np.argmax(semantic_label,axis = 2)
     #     semantic_image =  o3d.t.geometry.Image(semantic_label).to(self.device)
     #     k = self.k
-                
+    #     # print(type(valid_voxel_indices))
     #     semantic_readings = semantic_image.as_tensor()[v_proj,
     #                                             u_proj].to(o3c.int64)
     #     # pdb.set_trace()
-    #     topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, ((self.k)*2)+1))
+    #     topk_open3d = self.vbg.attribute('topkclassesandfreq').reshape((-1, ((self.k)*2)+1))
+    #     topk = torch.utils.dlpack.from_dlpack(topk_open3d.to_dlpack())
     #     topsemanticlabel = semantic_readings[mask_inlier].flatten()
-
+    #     topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
+    #     valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
     #     # gpu_memory_usage.append(get_gpu_memory_usage())
     #     # gpu_memory_usage_np = np.array(gpu_memory_usage)
     #     # np.save(os.path.join(arr_dir, "gpu_memory_usage2.npy"), gpu_memory_usage_np)
+    #     # print(type(valid_voxel_indices_torch))
+    #     # print(type(k))
+    #     # topk = topk.type(torch.int32)
+    #     topk[valid_voxel_indices_torch, 2*(self.k)] += 1
+    #     # print(valid_voxel_indices_torch.shape)
 
-    #     topk[valid_voxel_indices, 2*(self.k)] += 1
 
+    #     ntopk = topk[valid_voxel_indices_torch,0:2*k:2]
+    #     c,d = torch.where(ntopk == topsemanticlabel_torch.reshape(-1,1))
+    #     topk[valid_voxel_indices_torch[c], 2*d + 1] += 1
 
         
+    #     counts = topk[valid_voxel_indices_torch,1:2*k:2]
+    #     labels = topk[valid_voxel_indices_torch, 0:2*k:2]
+
+    #     sorted_indices = torch.argsort(-counts, axis=1)
+
+    #     #    sorted_counts = counts[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
+    #     #    sorted_labels = labels[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
+    #     sorted_counts = counts.gather(1, sorted_indices)
+    #     sorted_labels = labels.gather(1, sorted_indices)
 
 
-    #     # matches = [np.zeros(valid_voxel_indices.shape, dtype=bool) for _ in range(self.k)]
-
-    #     # matches stores the masks for voxel_indices that had label from the top-k labels  this iteration
-    #     # for i in range(self.k):
-    #     #     if i == 0:
-    #     #         matches[i] = (topk[valid_voxel_indices, 0] == topsemanticlabel).cpu().numpy()
-    #     #     else:
-    #     #         matches[i] = (topk[valid_voxel_indices, 2*i] == topsemanticlabel).cpu().numpy() & ~np.any(matches[:i], axis=0)
-
-    #     # increment the count of top-k label matches
-    #     # for i in range(self.k):
-    #     #     topk[valid_voxel_indices[matches[i]], 2 * i + 1] += 1
-    #     ntopk = topk[valid_voxel_indices,0:2*k:2].cpu().numpy()
-    #     c,d = np.where(ntopk == topsemanticlabel.cpu().numpy().reshape(-1,1))
-    #     topk[valid_voxel_indices[c.astype(int)], 2*d.astype(int) + 1] += 1
-
-
-    #     # making sure that the top-k attribute is sorted after count increments
-    #     # for i in range(1,self.k):
-    #     #     adjust_mask = topk[valid_voxel_indices[matches[i]], 2*i+1] > topk[valid_voxel_indices[matches[i]], 2*(i-1) + 1]
-    #     #     topk[valid_voxel_indices[matches[i]][adjust_mask], [[2*i], [2*i+1], [2*(i-1)], [2*(i-1)+1]]] = topk[valid_voxel_indices[matches[i]][adjust_mask], [[2*(i-1)], [2*(i-1)+1], [2*i], [2*i+1]]] 
-    #     counts = topk[valid_voxel_indices,1:2*k:2].cpu().numpy()
-    #     labels = topk[valid_voxel_indices, 0:2*k:2].cpu().numpy()
-
-    #     sorted_indices = np.argsort(-counts, axis=1)
-
-    #     sorted_counts = counts[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
-    #     sorted_labels = labels[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
-
-    #     topk[valid_voxel_indices, 0:2*k:2] = sorted_labels
-    #     topk[valid_voxel_indices, 1:2*k:2] = sorted_counts
+    #     topk[valid_voxel_indices_torch, 0:2*k:2] = sorted_labels
+    #     topk[valid_voxel_indices_torch, 1:2*k:2] = sorted_counts
 
 
     #     # Handle non-matches (voxel_indixes where the obsereved class was not already in the top-k labels)
 
-    #     no_match = ~np.isin(valid_voxel_indices.cpu().numpy(), valid_voxel_indices[c].cpu().numpy())
-    #     no_match_indices = valid_voxel_indices[no_match]
-    #     no_match_labels = topsemanticlabel[no_match]
+    #     #    no_match = ~np.isin(valid_voxel_indices.cpu().numpy(), valid_voxel_indices[c].cpu().numpy())
+    #     no_match = ~torch.isin(valid_voxel_indices_torch, valid_voxel_indices_torch[c])
+    #     no_match_indices = valid_voxel_indices_torch[no_match]
+    #     no_match_labels = topsemanticlabel_torch[no_match]
 
     #     # Find the top most empty slot to add a new label to the top-k attribute
     #     # empty_slots = [((topk[no_match_indices, 2 * i] == -1).cpu().numpy()) & (~np.any([((topk[no_match_indices, 2 * j] == -1).cpu().numpy()) for j in range(i)], axis=0)) for i in range(self.k)]
 
     #     # # Fill empty slots with new labels
 
-    #     # for i in range(self.k):
-    #     #     topk[no_match_indices[empty_slots[i]], 2 * i] = no_match_labels[empty_slots[i]]
-    #     #     topk[no_match_indices[empty_slots[i]], 2 * i + 1] = 1
 
-    #     empty_slots_mask = (topk[no_match_indices, 0:2*k:2] == 1000).cpu().numpy()
-    #     first_empty_slot = np.argmax(empty_slots_mask, axis=1)
-    #     has_empty_slot = np.any(empty_slots_mask, axis=1)
+    #     empty_slots_mask = (topk[no_match_indices, 0:2*k:2] == 1000)
+    #     first_empty_slot = torch.argmax(empty_slots_mask.to(torch.int16), dim=1)
+    #     has_empty_slot = torch.any(empty_slots_mask, dim=1)
     #     slot_indices = first_empty_slot[has_empty_slot]
-    #     topk[no_match_indices[has_empty_slot], 2 * slot_indices] = no_match_labels[has_empty_slot]
+    #     topk[no_match_indices[has_empty_slot], 2 * slot_indices] = no_match_labels[has_empty_slot].to(torch.int16)
     #     topk[no_match_indices[has_empty_slot], 2 * slot_indices + 1] = 1
 
     #     # Handle fully occupied voxel_indices which had no matches to top-k and no empty slots
@@ -835,7 +960,7 @@ class topkhist(Reconstruction):
     #     fully_occupied_indices = no_match_indices[fully_occupied]
 
 
-    #     #decrement the count of the top-k label with the least count and remove it if count reaches 0
+    #     # decrement the count of the top-k label with the least count and remove it if count reaches 0
     #     if len(fully_occupied_indices) > 0:
     #         topk[fully_occupied_indices, 2*k-1] -= 1
     #         remove_indices =  topk[fully_occupied_indices, 2*k-1] <= 0
@@ -843,10 +968,17 @@ class topkhist(Reconstruction):
     #         topk[fully_occupied_indices[remove_indices], 2*k-2] = 1000
 
 
-        
 
+    #     # topk_open3d = o3d.core.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(topk.type(torch.uint16)))
+    #     # print(topk[valid_voxel_indices_torch][0:10])
+    #     # topk_dlpack = torch.utils.dlpack.to_dlpack(topk.type(torch.uint16))
+    #     # topk_open3d_updated = o3d.core.Tensor.from_dlpack(topk_dlpack)
+    #     # t = self.vbg.attribute('topkclassesandfreq') 
+    #     # t = topk_open3d_updated
+    #     # print(topk[valid_voxel_indices_torch[0]])
+    #     # print(topk_open3d[valid_voxel_indices[0]])
     #     # semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
-        
+
     #     o3d.core.cuda.synchronize()
     #     # gpu_memory_usage.append(get_gpu_memory_usage())
     #     # gpu_memory_usage_np = np.array(gpu_memory_usage)
@@ -855,153 +987,18 @@ class topkhist(Reconstruction):
     #     # gpu_memory_usage.append(get_gpu_memory_usage())
     #     # gpu_memory_usage_np = np.array(gpu_memory_usage)
     #     # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
-
+        
 
     #     o3d.core.cuda.release_cache()
+    #     # torch.cuda.synchronize()
 
-    #     # gpu_memory_usage.append(get_gpu_memory_usage())
-    #     # gpu_memory_usage_np = np.array(gpu_memory_usage)
-    #     # np.save(os.path.join(arr_dir, "gpu_memory_usage2.npy"), gpu_memory_usage_np)
-
-    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
+    #     # Release GPU cache (equivalent to o3d.core.cuda.release_cache())
+    #     # torch.cuda.empty_cache()
 
 
-
-       # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/Segformer topk'
-       # # plot_dir = os.path.join(des, 'topk')
-       # arr_dir = os.path.join(arr_des, '4')
-       # # if not os.path.exists(plot_dir):
-       # #     os.makedirs(plot_dir)
-       # if not os.path.exists(arr_dir):
-       #     os.makedirs(arr_dir)
-        # try:
-        #     a_b1 = self.vbg.hashmap()
-        #     a_b = a_b1.active_buf_indices()
-        #     self.block_count.append(len(a_b))
-        #     block_count_np = np.array(self.block_count)
-        #     np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
-        #     hs = a_b1.size()
-        #     self.hashmap_size.append(hs)
-        #     hashmap_size_np = np.array(self.hashmap_size)
-        #     np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
-        #     tb = a_b1.capacity()
-        #     self.total_blocks.append(tb)
-        #     total_blocks_np = np.array(self.total_blocks)
-        #     np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
-
-        #     # print(b_c)
-        # except Exception as e:
-        #     print(e)
-
-
-
-
-        semantic_label = np.argmax(semantic_label,axis = 2)
-        semantic_image =  o3d.t.geometry.Image(semantic_label).to(self.device)
-        k = self.k
-        # print(type(valid_voxel_indices))
-        semantic_readings = semantic_image.as_tensor()[v_proj,
-                                                u_proj].to(o3c.int64)
-        # pdb.set_trace()
-        topk_open3d = self.vbg.attribute('topkclassesandfreq').reshape((-1, ((self.k)*2)+1))
-        topk = torch.utils.dlpack.from_dlpack(topk_open3d.to_dlpack())
-        topsemanticlabel = semantic_readings[mask_inlier].flatten()
-        topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
-        valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
-        # gpu_memory_usage.append(get_gpu_memory_usage())
-        # gpu_memory_usage_np = np.array(gpu_memory_usage)
-        # np.save(os.path.join(arr_dir, "gpu_memory_usage2.npy"), gpu_memory_usage_np)
-        # print(type(valid_voxel_indices_torch))
-        # print(type(k))
-        # topk = topk.type(torch.int32)
-        topk[valid_voxel_indices_torch, 2*(self.k)] += 1
-        # print(valid_voxel_indices_torch.shape)
-
-
-        ntopk = topk[valid_voxel_indices_torch,0:2*k:2]
-        c,d = torch.where(ntopk == topsemanticlabel_torch.reshape(-1,1))
-        topk[valid_voxel_indices_torch[c], 2*d + 1] += 1
-
-        
-        counts = topk[valid_voxel_indices_torch,1:2*k:2]
-        labels = topk[valid_voxel_indices_torch, 0:2*k:2]
-
-        sorted_indices = torch.argsort(-counts, axis=1)
-
-        #    sorted_counts = counts[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
-        #    sorted_labels = labels[np.arange(valid_voxel_indices.shape[0]).reshape(-1,1), sorted_indices]
-        sorted_counts = counts.gather(1, sorted_indices)
-        sorted_labels = labels.gather(1, sorted_indices)
-
-
-        topk[valid_voxel_indices_torch, 0:2*k:2] = sorted_labels
-        topk[valid_voxel_indices_torch, 1:2*k:2] = sorted_counts
-
-
-        # Handle non-matches (voxel_indixes where the obsereved class was not already in the top-k labels)
-
-        #    no_match = ~np.isin(valid_voxel_indices.cpu().numpy(), valid_voxel_indices[c].cpu().numpy())
-        no_match = ~torch.isin(valid_voxel_indices_torch, valid_voxel_indices_torch[c])
-        no_match_indices = valid_voxel_indices_torch[no_match]
-        no_match_labels = topsemanticlabel_torch[no_match]
-
-        # Find the top most empty slot to add a new label to the top-k attribute
-        # empty_slots = [((topk[no_match_indices, 2 * i] == -1).cpu().numpy()) & (~np.any([((topk[no_match_indices, 2 * j] == -1).cpu().numpy()) for j in range(i)], axis=0)) for i in range(self.k)]
-
-        # # Fill empty slots with new labels
-
-
-        empty_slots_mask = (topk[no_match_indices, 0:2*k:2] == 1000)
-        first_empty_slot = torch.argmax(empty_slots_mask.to(torch.int16), dim=1)
-        has_empty_slot = torch.any(empty_slots_mask, dim=1)
-        slot_indices = first_empty_slot[has_empty_slot]
-        topk[no_match_indices[has_empty_slot], 2 * slot_indices] = no_match_labels[has_empty_slot].to(torch.int16)
-        topk[no_match_indices[has_empty_slot], 2 * slot_indices + 1] = 1
-
-        # Handle fully occupied voxel_indices which had no matches to top-k and no empty slots
-        fully_occupied = ~has_empty_slot
-        fully_occupied_indices = no_match_indices[fully_occupied]
-
-
-        # decrement the count of the top-k label with the least count and remove it if count reaches 0
-        if len(fully_occupied_indices) > 0:
-            topk[fully_occupied_indices, 2*k-1] -= 1
-            remove_indices =  topk[fully_occupied_indices, 2*k-1] <= 0
-            topk[fully_occupied_indices[remove_indices], 2*k-1] = 0
-            topk[fully_occupied_indices[remove_indices], 2*k-2] = 1000
-
-
-
-        # topk_open3d = o3d.core.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(topk.type(torch.uint16)))
-        # print(topk[valid_voxel_indices_torch][0:10])
-        # topk_dlpack = torch.utils.dlpack.to_dlpack(topk.type(torch.uint16))
-        # topk_open3d_updated = o3d.core.Tensor.from_dlpack(topk_dlpack)
-        # t = self.vbg.attribute('topkclassesandfreq') 
-        # t = topk_open3d_updated
-        # print(topk[valid_voxel_indices_torch[0]])
-        # print(topk_open3d[valid_voxel_indices[0]])
-        # semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
-
-        o3d.core.cuda.synchronize()
-        # gpu_memory_usage.append(get_gpu_memory_usage())
-        # gpu_memory_usage_np = np.array(gpu_memory_usage)
-        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
-        # print("here")
-        # gpu_memory_usage.append(get_gpu_memory_usage())
-        # gpu_memory_usage_np = np.array(gpu_memory_usage)
-        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
-        
-
-        o3d.core.cuda.release_cache()
-        # torch.cuda.synchronize()
-
-        # Release GPU cache (equivalent to o3d.core.cuda.release_cache())
-        # torch.cuda.empty_cache()
-
-
-       # gpu_memory_usage.append(get_gpu_memory_usage())
-       # gpu_memory_usage_np = np.array(gpu_memory_usage)
-       # np.save(os.path.join(arr_dir, "gpu_memory_usage2.npy"), gpu_memory_usage_np)
+    #    # gpu_memory_usage.append(get_gpu_memory_usage())
+    #    # gpu_memory_usage_np = np.array(gpu_memory_usage)
+    #    # np.save(os.path.join(arr_dir, "gpu_memory_usage2.npy"), gpu_memory_usage_np)
 
     def extract_point_cloud(self,return_raw_logits = False):
 
@@ -1562,9 +1559,9 @@ class Decoder(nn.Module):
         return x
 
 encoded_dimension = 8
-encoder_path = 'scannetpp_mseloss_weights/encoded_dim_8/na-epoch=30-val_loss=0.00001.ckpt'
-encoder_model = LitAutoEncoder.load_from_checkpoint(encoder_path, encoder=Encoder(
-    150, encoded_dimension), decoder=Decoder(encoded_dimension, 150))
+# encoder_path = 'scannetpp_mseloss_weights/encoded_dim_8/na-epoch=30-val_loss=0.00001.ckpt'
+# encoder_model = LitAutoEncoder.load_from_checkpoint(encoder_path, encoder=Encoder(
+#     150, encoded_dimension), decoder=Decoder(encoded_dimension, 150))
 
 # # decoder_path = 'na-epoch=21-val_loss=0.00000.ckpt'
 # # decoder_model = LitAutoDecoder.load_from_checkpoint(decoder_path, encoder=Encoder(

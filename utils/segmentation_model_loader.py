@@ -12,11 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-from src.build_model import build_model
-from src.models.model import Upsample
-from src.prepare_data import prepare_data
+# from src.build_model import build_model
+# from src.models.model import Upsample
+# from src.prepare_data import prepare_data
 from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation, MaskFormerFeatureExtractor, MaskFormerForInstanceSegmentation
-import nvidia_smi
+# import nvidia_smi
 import os
 
 
