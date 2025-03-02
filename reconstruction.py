@@ -689,9 +689,9 @@ class topkhist(Reconstruction):
     def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,k1=4):
         self.k = k1
         super().__init__(depth_scale,depth_max,res,voxel_size,trunc_multiplier,n_labels,integrate_color,device,miu)
-        self.arr_des = '/home/motion/semanticmapping/visuals/arrays/7e09430da7/cacherelease'
+        # self.arr_des = '/home/motion/semanticmapping/visuals/arrays/7e09430da7/cacherelease'
         # # plot_dir = os.path.join(des, 'topk')
-        self.arr_dir = os.path.join(self.arr_des, f'scannetpp_Segformer_150_topk1')
+        # self.arr_dir = os.path.join(self.arr_des, f'scannetpp_Segformer_150_topk1')
         # arr_dir = os.path.join(arr_des, f'scannetpp_Segformer_150_topk1')
         # # if not os.path.exists(plot_dir):
         # #     os.makedirs(plot_dir)
@@ -717,7 +717,7 @@ class topkhist(Reconstruction):
             self.voxel_size,self.res, 17500, self.device)
             topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
             classindices = np.arange(0, ((self.k)*2), 2)
-            topk[:,classindices] = 1000
+            topk[:,classindices] = -1
             topk[:,classindices+1] = 0
             topk[:,(self.k)*2] = 0
 
@@ -729,7 +729,7 @@ class topkhist(Reconstruction):
             self.voxel_size,self.res, 17500, self.device)
             topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
             classindices = np.arange(0, ((self.k)*2), 2)
-            topk[:,classindices] = 1000
+            topk[:,classindices] = -1
             topk[:,classindices+1] = 0
             topk[:,(self.k)*2] = 0
         else:
@@ -1023,7 +1023,7 @@ class topkhist(Reconstruction):
                 # Flatten and filter out invalid entries
                 valid_class_indices = (topk[:, class_indices]).cpu().numpy().flatten()  # Shape: (num_points * self.k,)
                 valid_class_counts = (topk[:, count_indices].cpu().numpy()).flatten()  # Shape: (num_points * self.k,)
-                valid_mask = valid_class_indices != 1000  # Shape: (num_points * self.k,)
+                valid_mask = valid_class_indices != -1  # Shape: (num_points * self.k,)
             
                 valid_class_indices = valid_class_indices[valid_mask]  # Shape: (num_valid_entries,)
                 valid_class_counts = valid_class_counts[valid_mask]  # Shape: (num_valid_entries,)
@@ -1751,6 +1751,253 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
                 return pcd, final_labels
             else:
                 return pcd, final_labels
+        else:
+            return pcd, None
+
+
+
+
+class topkhistMisraGries(Reconstruction):
+    def __init__(self, depth_scale=1000.0, depth_max=5.0, res=8, voxel_size=0.025,
+                 trunc_multiplier=8, n_labels=None, integrate_color=True,
+                 device=o3d.core.Device('CUDA:0'), miu=0.001, k1=4):
+        self.k = k1
+        super().__init__(depth_scale, depth_max, res, voxel_size, trunc_multiplier, n_labels, integrate_color, device, miu)
+
+
+    def initialize_vbg(self):
+        if(self.integrate_color and (self.n_labels is None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'color'),
+            (o3c.float32, o3c.float32, o3c.float32), ((1), (1), (3)),
+            self.voxel_size,self.res, 17500, self.device)
+        elif((self.integrate_color == False) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.int16), ((1), (1), (((self.k)*2)+1)),
+            self.voxel_size,self.res, 17500, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2), 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+
+
+        elif((self.integrate_color) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight','color','topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.float32,o3c.int16), ((1), (1),(3),((((self.k)*2)+1))),
+            self.voxel_size,self.res, 17500, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2), 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+        else:
+            print('No color or Semantics')
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight'),
+            (o3c.float32, o3c.float32), ((1), (1)),
+            self.voxel_size,self.res, 17500, self.device)
+
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+        k = self.k
+        semantic_label = np.argmax(semantic_label, axis=2)
+        semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
+        semantic_readings = semantic_image.as_tensor()[v_proj, u_proj].to(o3c.int64)
+
+        topk_open3d = self.vbg.attribute('topkclassesandfreq').reshape((-1, (2 * k) + 1))
+        topk = torch.utils.dlpack.from_dlpack(topk_open3d.to_dlpack())
+
+        topsemanticlabel = semantic_readings[mask_inlier].flatten()
+        topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
+        valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
+
+        topk[valid_voxel_indices_torch, 2 * k] += 1         # dont need to keep total count but for debugging
+        ntopk = topk[valid_voxel_indices_torch, 0:2 * k:2]
+        match_mask = (ntopk == topsemanticlabel_torch.reshape(-1, 1))
+        has_match = torch.any(match_mask, dim=1)
+
+        if has_match.any():
+            match_rows = valid_voxel_indices_torch[has_match]
+            first_match_idx = torch.argmax(match_mask[has_match].to(torch.int32), dim=1)
+            head_count_cols = 2 * first_match_idx + 1
+            topk[match_rows, head_count_cols] += 1
+
+        no_match = ~has_match
+        no_match_indices = valid_voxel_indices_torch[no_match]
+        no_match_labels = topsemanticlabel_torch[no_match]
+        empty_placeholder = -1
+        empty_slots_mask = (topk[no_match_indices, 0:2 * k:2] == empty_placeholder)
+        has_empty_slot = torch.any(empty_slots_mask, dim=1)
+
+        if has_empty_slot.any():
+            voxels_with_empty = no_match_indices[has_empty_slot]
+            first_empty_slot = torch.argmax(empty_slots_mask[has_empty_slot].to(torch.int32), dim=1)
+            topk[voxels_with_empty, 2 * first_empty_slot] = no_match_labels[has_empty_slot].to(torch.int16)
+            topk[voxels_with_empty, 2 * first_empty_slot + 1] = 1
+
+        fully_occupied = ~has_empty_slot
+        if fully_occupied.any():
+            fully_occupied_indices = no_match_indices[fully_occupied]
+            topk[fully_occupied_indices, 1:2 * k:2] -= 1   
+            removal_mask = topk[fully_occupied_indices, 1:2 * k:2] <= 0
+            if removal_mask.any():
+                topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
+                topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
+
+        o3d.core.cuda.synchronize()
+        o3d.core.cuda.release_cache()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+
+    def extract_point_cloud(self):
+        pcd = self.vbg.extract_point_cloud().to_legacy()
+        target_points = np.asarray(pcd.points)
+        if self.semantic_integration:
+            topk, _ = get_properties(self.vbg, target_points, 'topkclassesandfreq', res=self.res, voxel_size=self.voxel_size, device=self.device)
+            if topk is not None:
+                a = np.zeros((topk.shape[0], self.n_labels), dtype=float)
+                class_indices = np.arange(0, 2 * self.k, 2)
+                count_indices = np.arange(1, 2 * self.k, 2)
+                valid_class_indices = (topk[:, class_indices]).cpu().numpy().flatten()
+                valid_class_counts = (topk[:, count_indices].cpu().numpy()).flatten()
+                valid_mask = valid_class_indices != -1
+
+                valid_class_indices = valid_class_indices[valid_mask]
+                valid_class_counts = valid_class_counts[valid_mask]
+                sums = (topk[:, count_indices]).cpu().numpy().sum(axis=1, keepdims=True)
+
+                a[np.repeat(np.arange(topk.shape[0]), self.k)[valid_mask], valid_class_indices] = valid_class_counts
+                valid_sums_mask = sums.flatten() > 0
+                a[valid_sums_mask] /= sums[valid_sums_mask]
+                a[~valid_sums_mask] = 1.0 / self.n_labels
+                return pcd, a.astype(np.float64)
+            else:
+                return None, None
+        else:
+            return pcd, None
+
+
+
+class topkhistKH(Reconstruction):
+    def __init__(self, depth_scale=1000.0, depth_max=5.0, res=8, voxel_size=0.025,
+                 trunc_multiplier=8, n_labels=None, integrate_color=True,
+                 device=o3d.core.Device('CUDA:0'), miu=0.001, k1=4):
+        self.k = k1
+        super().__init__(depth_scale, depth_max, res, voxel_size, trunc_multiplier, n_labels, integrate_color, device, miu)
+    
+    def initialize_vbg(self):
+        if(self.integrate_color and (self.n_labels is None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'color'),
+            (o3c.float32, o3c.float32, o3c.float32), ((1), (1), (3)),
+            self.voxel_size,self.res, 17500, self.device)
+
+        elif((self.integrate_color == False) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight', 'topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.int16), ((1), (1), (((self.k)*2)+1)),
+            self.voxel_size,self.res, 17500, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2), 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+
+        elif((self.integrate_color) and (self.n_labels is not None)):
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight','color','topkclassesandfreq'),
+            (o3c.float32, o3c.float32, o3c.float32,o3c.int16), ((1), (1),(3),((((self.k)*2)+1))),
+            self.voxel_size,self.res, 17500, self.device)
+            topk = self.vbg.attribute('topkclassesandfreq').reshape((-1, (((self.k)*2)+1)))
+            classindices = np.arange(0, ((self.k)*2), 2)
+            topk[:,classindices] = -1
+            topk[:,classindices+1] = 0
+            topk[:,(self.k)*2] = 0
+        else:
+            print('No color or Semantics')
+            self.vbg = o3d.t.geometry.VoxelBlockGrid(
+            ('tsdf', 'weight'),
+            (o3c.float32, o3c.float32), ((1), (1)),
+            self.voxel_size,self.res, 17500, self.device)
+
+
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+        k = self.k
+        semantic_label = np.argmax(semantic_label, axis=2)
+        semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
+        semantic_readings = semantic_image.as_tensor()[v_proj, u_proj].to(o3c.int64)
+
+        topk_open3d = self.vbg.attribute('topkclassesandfreq').reshape((-1, (2 * k) + 1))
+        topk = torch.utils.dlpack.from_dlpack(topk_open3d.to_dlpack())
+
+        topsemanticlabel = semantic_readings[mask_inlier].flatten()
+        topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
+        valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
+
+        topk[valid_voxel_indices_torch, 2 * k] += 1     # Remove the total count later 
+        ntopk = topk[valid_voxel_indices_torch, 0:2 * k:2]
+        match_mask = (ntopk == topsemanticlabel_torch.reshape(-1, 1))
+        has_match = torch.any(match_mask, dim=1)
+
+        if has_match.any():
+            match_rows = valid_voxel_indices_torch[has_match]
+            first_match_idx = torch.argmax(match_mask[has_match].to(torch.int32), dim=1)
+            head_count_cols = 2 * first_match_idx + 1
+            topk[match_rows, head_count_cols] += k  # Increment matched count by k
+
+        no_match = ~has_match
+        no_match_indices = valid_voxel_indices_torch[no_match]
+        no_match_labels = topsemanticlabel_torch[no_match]
+        empty_placeholder = -1
+        empty_slots_mask = (topk[no_match_indices, 0:2 * k:2] == empty_placeholder)
+        has_empty_slot = torch.any(empty_slots_mask, dim=1)
+
+        if has_empty_slot.any():
+            voxels_with_empty = no_match_indices[has_empty_slot]
+            first_empty_slot = torch.argmax(empty_slots_mask[has_empty_slot].to(torch.int32), dim=1)
+            topk[voxels_with_empty, 2 * first_empty_slot] = no_match_labels[has_empty_slot].to(torch.int16)
+            topk[voxels_with_empty, 2 * first_empty_slot + 1] = k  # Initialize new class with k
+
+        fully_occupied = ~has_empty_slot
+        if fully_occupied.any():
+            fully_occupied_indices = no_match_indices[fully_occupied]
+            topk[fully_occupied_indices, 1:2 * k:2] -= 1  # Decrement all stored classes by 1
+            removal_mask = topk[fully_occupied_indices, 1:2 * k:2] <= 0
+            if removal_mask.any():
+                topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
+                topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
+
+        o3d.core.cuda.synchronize()
+        o3d.core.cuda.release_cache()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+
+    def extract_point_cloud(self):
+        pcd = self.vbg.extract_point_cloud().to_legacy()
+        target_points = np.asarray(pcd.points)
+        if self.semantic_integration:
+            topk, _ = get_properties(self.vbg, target_points, 'topkclassesandfreq', res=self.res, voxel_size=self.voxel_size, device=self.device)
+            if topk is not None:
+                a = np.zeros((topk.shape[0], self.n_labels), dtype=float)
+                class_indices = np.arange(0, 2 * self.k, 2)
+                count_indices = np.arange(1, 2 * self.k, 2)
+                valid_class_indices = (topk[:, class_indices]).cpu().numpy().flatten()
+                valid_class_counts = (topk[:, count_indices].cpu().numpy()).flatten()
+                valid_mask = valid_class_indices != -1
+
+                valid_class_indices = valid_class_indices[valid_mask]
+                valid_class_counts = valid_class_counts[valid_mask]
+                sums = (topk[:, count_indices]).cpu().numpy().sum(axis=1, keepdims=True)
+
+                a[np.repeat(np.arange(topk.shape[0]), self.k)[valid_mask], valid_class_indices] = valid_class_counts
+                valid_sums_mask = sums.flatten() > 0
+                a[valid_sums_mask] /= sums[valid_sums_mask]
+                a[~valid_sums_mask] = 1.0 / self.n_labels
+                return pcd, a.astype(np.float64)
+            else:
+                return None, None
         else:
             return pcd, None
 

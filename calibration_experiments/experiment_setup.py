@@ -76,6 +76,12 @@ class Experiment_Generator:
         elif(integration == 'topk'):
             rec = topkhist(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu,k1 = k2)
+        elif(integration == 'MisraGries'):
+            rec = topkhistMisraGries(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+            device = o3d.core.Device(self.o3d_device),miu =self.miu,k1 = k2)
+        elif(integration == 'topk KH'):
+            rec = topkhistKH(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+            device = o3d.core.Device(self.o3d_device),miu =self.miu,k1 = k2)
         elif(integration == 'Generalized'):
             if(calibration == 'None'):
                 rec = GeneralizedIntegration(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,

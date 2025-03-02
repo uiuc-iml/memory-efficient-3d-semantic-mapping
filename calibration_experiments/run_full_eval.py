@@ -102,10 +102,10 @@ def compute_mIoUs():
                 # diff_labels = labels[unscrambler]
                 diff_labels = labels
                 gt_labels = gt_labels[scrambler]
-                # print(gt_labels.shape)
+                print(gt_labels.shape)
                 # print(labels.shape)
 
-                # diff_labels = np.argmax(diff_labels, axis=1)
+                diff_labels = np.argmax(diff_labels, axis=1)
                 # gt_labels = np.argmax(gt_labels,axis =1)
                 totals_gt.extend(gt_labels.tolist())
                 totals.extend(diff_labels.tolist())
@@ -127,9 +127,9 @@ def compute_mIoUs():
                 continue
         IoU = jaccard_index(task = 'multiclass',preds=torch.from_numpy(np.array(totals)),target = torch.from_numpy(np.array(totals_gt)),num_classes = num_classes,ignore_index=num_classes,average = None)
         non_null = np.array(totals_gt) != num_classes
-        accuracy = (np.array(totals)[non_null].argmax(axis = 1) == np.array(totals_gt)[non_null]).sum()/np.array(totals)[non_null].shape[0]
+        accuracy = (np.array(totals)[non_null] == np.array(totals_gt)[non_null]).sum()/np.array(totals)[non_null].shape[0]
         accuracies.append(accuracy)
-        pred = np.array(totals)[non_null].argmax(axis = 1).tolist()     
+        pred = np.array(totals)[non_null].tolist()     
         absent = set(list(range(num_classes))) - set(pred + totals_gt)
         IoUs.update({'aggregate':IoU})
         absents.update({'aggregate':absent})
@@ -349,7 +349,7 @@ def compute_brier_scores():
     per_scene_mECEs = []
     for g,experiment in enumerate(experiments):
         multiply = False
-        mECE_cal = metric(no_void = False, n_classes=num_classes, one_hot=False, ignore_last_from_gt=True)
+        mECE_cal = metric(no_void = True, n_classes=num_classes, one_hot=False)
 
         # cc_3d = Calibration_calc_3D(no_void = True)
         pcds_template = '{}/{}/{}/*.pcd'
@@ -362,7 +362,7 @@ def compute_brier_scores():
         per_scene_mECE = []
         for scene in selected_scenes:
             try:
-                per_scene_cal =  metric(no_void = False, n_classes=num_classes, one_hot=False, ignore_last_from_gt=True)
+                per_scene_cal =  metric(no_void = True, n_classes=num_classes, one_hot=False)
 
                 # gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
                 # gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
@@ -438,16 +438,17 @@ def compute_brier_scores():
 
 from multiprocessing import Process
 
-p1 = Process(target = compute_mIoUs)
-p2 = Process(target = compute_mECEs)
-p3 = Process(target = compute_brier_scores)
-
-p1.start()
-p2.start()
-p3.start()
-p1.join()
-p2.join()
-p3.join()
+# p1 = Process(target = compute_mIoUs)
+# p2 = Process(target = compute_mECEs)
+# p3 = Process(target = compute_brier_scores)
+# compute_mIoUs()
+compute_brier_scores()
+# p1.start()
+# p2.start()
+# p3.start()
+# p1.join()
+# p2.join()
+# p3.join()
 # compute_mIoUs()
 # compute_mECEs()
 # compute_brier_scores()
