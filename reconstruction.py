@@ -299,13 +299,13 @@ class Reconstruction:
         # performing semantic integration
         #  Laplace Smoothing of the observation
         # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-        arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease'
+        # arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease'
         # plot_dir = os.path.join(des, "Maskformer Geometric Mean")
-        self.arr_dir = os.path.join(arr_des, "Maskformer Naive Bayesian")
+        # self.arr_dir = os.path.join(arr_des, "Maskformer Naive Bayesian")
         # if not os.path.exists(plot_dir):
         #     os.makedirs(plot_dir)
-        if not os.path.exists(self.arr_dir):
-            os.makedirs(self.arr_dir)
+        # if not os.path.exists(self.arr_dir):
+        #     os.makedirs(self.arr_dir)
         
         # print(type(semantic_label))
         # semantic_label += self.miu
@@ -313,20 +313,20 @@ class Reconstruction:
         # semantic_label = semantic_label/renormalizer
         # # print(type(semantic_label))
         # # print(type(self.miu))
-        a_b1 = self.vbg.hashmap()
-        a_b = a_b1.active_buf_indices()
-        self.block_count.append(len(a_b))
-        block_count_np = np.array(self.block_count)
-        np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
-        # # # print(b_c)
-        hs = a_b1.size()
-        self.hashmap_size.append(hs)
-        hashmap_size_np = np.array(self.hashmap_size)
-        np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
-        tb = a_b1.capacity()
-        self.total_blocks.append(tb)
-        total_blocks_np = np.array(self.total_blocks)
-        np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
+        # a_b1 = self.vbg.hashmap()
+        # a_b = a_b1.active_buf_indices()
+        # self.block_count.append(len(a_b))
+        # block_count_np = np.array(self.block_count)
+        # np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
+        # # # # print(b_c)
+        # hs = a_b1.size()
+        # self.hashmap_size.append(hs)
+        # hashmap_size_np = np.array(self.hashmap_size)
+        # np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
+        # tb = a_b1.capacity()
+        # self.total_blocks.append(tb)
+        # total_blocks_np = np.array(self.total_blocks)
+        # np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
         
         
         
@@ -1558,8 +1558,8 @@ class Decoder(nn.Module):
         x = F.softmax(x, dim=-1)
         return x
 
-encoded_dimension = 8
-# encoder_path = 'scannetpp_mseloss_weights/encoded_dim_8/na-epoch=30-val_loss=0.00001.ckpt'
+# encoded_dimension = 2
+# encoder_path = 'scannetpp_mseloss_weights/encoded_dim_2/na-epoch=11-val_loss=0.00024.ckpt'
 # encoder_model = LitAutoEncoder.load_from_checkpoint(encoder_path, encoder=Encoder(
 #     150, encoded_dimension), decoder=Decoder(encoded_dimension, 150))
 
@@ -1568,8 +1568,38 @@ encoded_dimension = 8
 # #     21, 8), decoder=Decoder(8, 21))
 
 class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
-    def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,encoded_dim=encoded_dimension):
+    def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,encoded_dim=4):
         self.encoded_dim = encoded_dim
+        if n_labels == 101:
+            if self.encoded_dim == 2:
+                encoder_path = 'finemaskformer_weights/encoded_dim_2/na-epoch=34-val_loss=0.00029.ckpt'
+            elif self.encoded_dim == 4:
+                encoder_path = 'finemaskformer_weights/encoded_dim_4/na-epoch=73-val_loss=0.00005.ckpt'
+            elif self.encoded_dim == 8:
+                encoder_path = 'finemaskformer_weights/encoded_dim_8/na-epoch=49-val_loss=0.00001.ckpt'
+            else:
+                raise ValueError(f"Unsupported encoded_dim: {self.encoded_dim}")
+            self.encoder_model = LitAutoEncoder.load_from_checkpoint(
+            encoder_path, 
+            encoder=Encoder(101, self.encoded_dim), 
+            decoder=Decoder(self.encoded_dim, 101)
+            )
+        elif n_labels == 150:
+            if self.encoded_dim == 2:
+                encoder_path = 'scannetpp_mseloss_weights/encoded_dim_2/na-epoch=11-val_loss=0.00024.ckpt'
+            elif self.encoded_dim == 4:
+                encoder_path = 'scannetpp_mseloss_weights/encoded_dim_4/na-epoch=25-val_loss=0.00004.ckpt'
+            elif self.encoded_dim == 8:
+                encoder_path = 'scannetpp_mseloss_weights/encoded_dim_8/na-epoch=30-val_loss=0.00001.ckpt'
+            else:
+                raise ValueError(f"Unsupported encoded_dim: {self.encoded_dim}")
+
+            self.encoder_model = LitAutoEncoder.load_from_checkpoint(
+                encoder_path, 
+                encoder=Encoder(150, self.encoded_dim), 
+                decoder=Decoder(self.encoded_dim, 150)
+            )
+
         super().__init__(depth_scale,depth_max,res,voxel_size,trunc_multiplier,n_labels,integrate_color,device,miu)
 
     def initialize_vbg(self):
@@ -1620,7 +1650,7 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
         encodeinput_t = torch.utils.dlpack.from_dlpack(encodeinput.to_dlpack())
         del encodeinput
         with torch.no_grad():
-            encoded_obs_t = encoder_model.encode(encodeinput_t).contiguous()
+            encoded_obs_t = self.encoder_model.encode(encodeinput_t).contiguous()
             encoded_obs = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(encoded_obs_t))
             # del encodeinput_t
             del encoded_obs_t
@@ -1636,40 +1666,40 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
 
 
 
-    # def extract_point_cloud(self,return_raw_logits = False):
+    def extract_point_cloud(self,return_raw_logits = False):
 
-    #     """Returns the current (colored) point cloud and the current probability estimate for each of the points, if performing metric-semantic reconstruction
+        """Returns the current (colored) point cloud and the current probability estimate for each of the points, if performing metric-semantic reconstruction
 
-    #     Returns:
-    #         open3d.cpu.pybind.t.geometry.PointCloud, np.array(N_points,n_labels) (or None)
-    #     """
-    #     pcd = self.vbg.extract_point_cloud()
-    #     pcd = pcd.to_legacy()
-    #     target_points = np.asarray(pcd.points)
-    #     if(self.semantic_integration):
-    #         labels,coords = get_properties(self.vbg,target_points,'encoded_vectors',res = self.res,voxel_size = self.voxel_size,device = self.device)
-    #         dlpack_tensor = labels.to_dlpack()
-    #         torch_labels = torch.utils.dlpack.from_dlpack(dlpack_tensor)
+        Returns:
+            open3d.cpu.pybind.t.geometry.PointCloud, np.array(N_points,n_labels) (or None)
+        """
+        pcd = self.vbg.extract_point_cloud()
+        pcd = pcd.to_legacy()
+        target_points = np.asarray(pcd.points)
+        if(self.semantic_integration):
+            labels,coords = get_properties(self.vbg,target_points,'encoded_vectors',res = self.res,voxel_size = self.voxel_size,device = self.device)
+            dlpack_tensor = labels.to_dlpack()
+            torch_labels = torch.utils.dlpack.from_dlpack(dlpack_tensor)
             
-    #         # Pass through decoder model
-    #         decoded_labels = encoder_model.decode(torch_labels)
+            # Pass through decoder model
+            decoded_labels = self.encoder_model.decode(torch_labels)
             
-    #         # Convert back to o3c.Tensor
-    #         decoded_labels_dlpack = torch.utils.dlpack.to_dlpack(decoded_labels)
-    #         labels = o3c.Tensor.from_dlpack(decoded_labels_dlpack)
+            # Convert back to o3c.Tensor
+            decoded_labels_dlpack = torch.utils.dlpack.to_dlpack(decoded_labels)
+            labels = o3c.Tensor.from_dlpack(decoded_labels_dlpack)
 
-    #         if labels is not None:
-    #             if(return_raw_logits):
-    #                 return pcd,labels.cpu().numpy().astype(np.float64)
-    #             else:
-    #                 labels = labels.cpu().numpy().astype(np.float64)
-    #                 return pcd,labels
-    #         else:
-    #             return None,None
-    #     else:
-    #         return pcd,None
+            if labels is not None:
+                if(return_raw_logits):
+                    return pcd,labels.cpu().numpy().astype(np.float64)
+                else:
+                    labels = labels.cpu().numpy().astype(np.float64)
+                    return pcd,labels
+            else:
+                return None,None
+        else:
+            return pcd,None
 
-    def extract_point_cloud(self, return_raw_logits=False):
+    def extract_point_cloud_max(self, return_raw_logits=False):
         """Returns the current (colored) point cloud and the current probability estimate for each of the points,
         if performing metric-semantic reconstruction.
 
@@ -1703,7 +1733,7 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
                     
                     # Pass through decoder model
                     with torch.no_grad(), torch.cuda.amp.autocast():
-                        decoded_labels = encoder_model.decode(torch_labels)
+                        decoded_labels = self.encoder_model.decode(torch_labels)
 
                     # Take argmax to get top label
                         top_labels = torch.argmax(decoded_labels, dim=1)

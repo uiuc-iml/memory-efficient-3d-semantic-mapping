@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
 from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction
-from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter
+from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter, FineMaskformerSegmenter
 from utils.clipfeatures import ClipFeatureExtractor
 
 
@@ -41,6 +41,7 @@ class Experiment_Generator:
         self.o3d_device = 'CUDA:{}'.format(gpu_to_use)
         self.torch_device = 'cuda:{}'.format(gpu_to_use)
         
+        self.k = experiment.get('k',None)
         k = experiment.get('k',None)
         rec = self.get_reconstruction(calibration,integration,segmentation,oracle,epsilon,L,learned,k)
 
@@ -65,7 +66,7 @@ class Experiment_Generator:
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
         elif(integration == 'Encoded Averaging'):
             rec = ProbabilisticAveragedEncodedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
-            device = o3d.core.Device(self.o3d_device),miu =self.miu)
+            device = o3d.core.Device(self.o3d_device),miu =self.miu, encoded_dim=self.k)
         elif(integration == 'Histogram'):
             rec = HistogramReconstruction16(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
@@ -92,11 +93,13 @@ class Experiment_Generator:
         return rec
 
     def get_model(self,segmentation,experiment,calibration):
-        assert segmentation in ['Segformer','ESANet', 'Maskformer', 'CLIP'],"Segmentation Model {} is not yet a valid choice"
+        assert segmentation in ['Segformer','ESANet', 'Maskformer', 'CLIP', 'FineMaskformer'],"Segmentation Model {} is not yet a valid choice"
         if(segmentation == 'Segformer'):
             model = FineTunedTSegmenter()
         elif(segmentation == 'Maskformer'):
             model = MaskformerSegmenter()
+        elif(segmentation == 'FineMaskformer'): # 100 classes
+            model = FineMaskformerSegmenter()
         elif(segmentation == 'ESANet'):
             model = FineTunedESANet()
         elif(segmentation == "CLIP"):

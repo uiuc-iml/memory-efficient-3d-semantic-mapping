@@ -26,9 +26,10 @@ def get_scannetpp_test_scenes():
     # return sorted(['c5f701a8c7', 'c856c41c99', 'cf1ffd871d', 'd6cbe4b28b', 'd7abfc4b17', 'd918af9c5f', 'e0de253456', 'e7ac609391', 'e8ea9b4da8', 
     #                 'eb4bc76767', 'ef69d58016', 'f248c2bcdc', 'fd361ab85f'])
     # return sorted(['a08d9a2476', 'c0f5742640',  'bb87c292ad','e7ac609391', 'fd361ab85f', 'ef69d58016', '8133208cb6', 'd7abfc4b17'])
-    return sorted(['45ba9ea301'])
-    # print(sorted(scenes[0:10]))
-    return sorted(scenes[0:10])
+    # return sorted(['45ba9ea301'])
+    print(sorted(scenes[0:10]))
+    # return sorted(scenes[0:2])
+    return sorted(scenes)
     
 def get_scannetpp_train_scenes():
     file_path = 'newtrain.txt'
@@ -83,10 +84,25 @@ def get_classes():
     return classes
 
 def get_scannetpp_classes():
-    classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
-        'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
-        'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
-        'radiator', 'glass', 'clock', 'flag']
+    # classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
+    #     'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
+    #     'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
+    #     'radiator', 'glass', 'clock', 'flag']
+    classes = [
+    "wall", "ceiling", "floor", "table", "door", "ceiling lamp", "cabinet", "blinds", "curtain", "chair",
+    "storage cabinet", "office chair", "bookshelf", "whiteboard", "window", "box", "window frame", "monitor",
+    "shelf", "doorframe", "pipe", "heater", "kitchen cabinet", "sofa", "windowsill", "bed", "shower wall",
+    "trash can", "book", "plant", "blanket", "tv", "computer tower", "kitchen counter", "refrigerator", "jacket",
+    "electrical duct", "sink", "bag", "picture", "pillow", "towel", "suitcase", "backpack", "crate", "keyboard",
+    "rack", "toilet", "paper", "printer", "poster", "painting", "microwave", "board", "shoes", "socket", "bottle",
+    "bucket", "cushion", "basket", "shoe rack", "telephone", "file folder", "cloth", "blind rail", "laptop",
+    "plant pot", "exhaust fan", "cup", "coat hanger", "light switch", "speaker", "table lamp", "air vent",
+    "clothes hanger", "kettle", "smoke detector", "container", "power strip", "slippers", "paper bag", "mouse",
+    "cutting board", "toilet paper", "paper towel", "pot", "clock", "pan", "tap", "jar", "soap dispenser",
+    "binder", "bowl", "tissue box", "whiteboard eraser", "toilet brush", "spray bottle", "headphones", "stapler",
+    "marker", "null"]
+
+
     return classes
 
 

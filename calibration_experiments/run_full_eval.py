@@ -37,7 +37,8 @@ no_void =  False
 fnames = get_filenames()
 
 results_dir = fnames['results_dir']
-
+results_dir = '/work/hdd/bebg/results/scannetpp'
+num_classes = 101
 def get_experiments_and_short_names():
     a = json.load(open('../settings/experiments_and_short_names.json','r'))
     experiments = a['experiments']
@@ -54,7 +55,7 @@ def compute_mIoUs():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
     pcds_template = '{}/{}/{}/*.pcd'
     labels_template = '{}/{}/{}/labels*.p'
     per_exp_IoUs = {}
@@ -110,8 +111,8 @@ def compute_mIoUs():
                 totals.extend(diff_labels.tolist())
                 unique_gt = np.unique(gt_labels).tolist()
                 unique_pred = np.unique(diff_labels).tolist()
-                absent = set(list(range(150))) - set(unique_gt + unique_pred)
-                IoU = jaccard_index(task = 'multiclass',preds = torch.from_numpy(diff_labels),target= torch.from_numpy(gt_labels),num_classes = 150, ignore_index=150,average = None)
+                absent = set(list(range(num_classes))) - set(unique_gt + unique_pred)
+                IoU = jaccard_index(task = 'multiclass',preds = torch.from_numpy(diff_labels),target= torch.from_numpy(gt_labels),num_classes = num_classes, ignore_index=num_classes,average = None)
                 IoUs.update({scene:IoU})
                 absents.update({scene:absent})
                 del pcd_tree
@@ -124,12 +125,12 @@ def compute_mIoUs():
             except Exception as e:
                 print(scene,'mIoU Reconstruction',e)
                 continue
-        IoU = jaccard_index(task = 'multiclass',preds=torch.from_numpy(np.array(totals)),target = torch.from_numpy(np.array(totals_gt)),num_classes = 150,ignore_index=150,average = None)
-        non_null = np.array(totals_gt) != 150
+        IoU = jaccard_index(task = 'multiclass',preds=torch.from_numpy(np.array(totals)),target = torch.from_numpy(np.array(totals_gt)),num_classes = num_classes,ignore_index=num_classes,average = None)
+        non_null = np.array(totals_gt) != num_classes
         accuracy = (np.array(totals)[non_null].argmax(axis = 1) == np.array(totals_gt)[non_null]).sum()/np.array(totals)[non_null].shape[0]
         accuracies.append(accuracy)
         pred = np.array(totals)[non_null].argmax(axis = 1).tolist()     
-        absent = set(list(range(150))) - set(pred + totals_gt)
+        absent = set(list(range(num_classes))) - set(pred + totals_gt)
         IoUs.update({'aggregate':IoU})
         absents.update({'aggregate':absent})
         per_exp_IoUs.update({experiment:IoUs})
@@ -144,7 +145,7 @@ def compute_mIoUs():
         IoUs = per_exp_IoUs[experiment]
         absents = per_exp_absents[experiment]
         expanded_scenes = selected_scenes+['aggregate']
-        metrics = np.zeros((len(expanded_scenes),150))
+        metrics = np.zeros((len(expanded_scenes),num_classes))
         for i,scene in enumerate(expanded_scenes):
             print(scene)
             metrics[i,:] = IoUs[scene]
@@ -194,14 +195,14 @@ def compute_mECEs():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
 
 
     ECE_by_experiment = []
 
     for g,experiment in enumerate(experiments):
-        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void, one_hot=False, n_classes=150)
-        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void, one_hot=False, n_classes=150)
+        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void, one_hot=False, n_classes=num_classes)
+        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void, one_hot=False, n_classes=num_classes)
         pcds_template = '{}/{}/{}/*.pcd'
         labels_template = '{}/{}/{}/labels*.p'
         gts = []
@@ -235,7 +236,7 @@ def compute_mECEs():
                     [k, idx, dist] = pcd_tree.search_knn_vector_3d(points[i],1)
                 #     print(points[i]-gt_points[idx],i,idx)
                     scrambler[i] = idx[0]
-                labels[labels.sum(axis =1)==0] = 1/150.0
+                labels[labels.sum(axis =1)==0] = 1/101.0
                 # this_stage_labels = deepcopy(gt_labels)
                 # this_stage_labels[:] = 1/150.0
                 # this_stage_labels[scrambler] = labels
@@ -264,10 +265,24 @@ def compute_mECEs():
     df = pd.DataFrame(mtx)
     # classes = ['null','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
     #            'counter','desk','curtain','refrigerator','shower curtain','toilet','sink','bathtub','otherfurniture','aggregate','TL-ECE']
-    classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
-        'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
-        'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
-        'radiator', 'glass', 'clock', 'flag', 'aggregate', 'TL-ECE']
+    # classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
+    #     'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
+    #     'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
+    #     'radiator', 'glass', 'clock', 'flag', 'aggregate', 'TL-ECE']
+    classes = [
+    "wall", "ceiling", "floor", "table", "door", "ceiling lamp", "cabinet", "blinds", "curtain", "chair",
+    "storage cabinet", "office chair", "bookshelf", "whiteboard", "window", "box", "window frame", "monitor",
+    "shelf", "doorframe", "pipe", "heater", "kitchen cabinet", "sofa", "windowsill", "bed", "shower wall",
+    "trash can", "book", "plant", "blanket", "tv", "computer tower", "kitchen counter", "refrigerator", "jacket",
+    "electrical duct", "sink", "bag", "picture", "pillow", "towel", "suitcase", "backpack", "crate", "keyboard",
+    "rack", "toilet", "paper", "printer", "poster", "painting", "microwave", "board", "shoes", "socket", "bottle",
+    "bucket", "cushion", "basket", "shoe rack", "telephone", "file folder", "cloth", "blind rail", "laptop",
+    "plant pot", "exhaust fan", "cup", "coat hanger", "light switch", "speaker", "table lamp", "air vent",
+    "clothes hanger", "kettle", "smoke detector", "container", "power strip", "slippers", "paper bag", "mouse",
+    "cutting board", "toilet paper", "paper towel", "pot", "clock", "pan", "tap", "jar", "soap dispenser",
+    "binder", "bowl", "tissue box", "whiteboard eraser", "toilet brush", "spray bottle", "headphones", "stapler",
+    "marker","null", "aggregate", "TL-ECE"]
+
     df.columns = classes
     df.loc[:,'experiments'] = short_names
     df = df.loc[:,[df.columns[-1]]+df.columns[:-1].tolist()]
@@ -325,7 +340,7 @@ def compute_brier_scores():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
 
     experiments,short_names = get_experiments_and_short_names()
     metric = BrierScore3D
@@ -334,7 +349,7 @@ def compute_brier_scores():
     per_scene_mECEs = []
     for g,experiment in enumerate(experiments):
         multiply = False
-        mECE_cal = metric(no_void = False, n_classes=150, one_hot=False, ignore_last_from_gt=True)
+        mECE_cal = metric(no_void = False, n_classes=num_classes, one_hot=False, ignore_last_from_gt=True)
 
         # cc_3d = Calibration_calc_3D(no_void = True)
         pcds_template = '{}/{}/{}/*.pcd'
@@ -347,7 +362,7 @@ def compute_brier_scores():
         per_scene_mECE = []
         for scene in selected_scenes:
             try:
-                per_scene_cal =  metric(no_void = False, n_classes=150, one_hot=False, ignore_last_from_gt=True)
+                per_scene_cal =  metric(no_void = False, n_classes=num_classes, one_hot=False, ignore_last_from_gt=True)
 
                 # gt_pcd_file = '{}/reconstruction_gts/gt_pcd_{}.pcd'.format(results_dir,scene)
                 # gt_labels_file = '{}/reconstruction_gts/gt_labels_{}.p'.format(results_dir,scene)
@@ -368,7 +383,7 @@ def compute_brier_scores():
                 if(np.any(labels > 1)):
                     labels = labels/labels.sum(axis = 1,keepdims = True)
                 labels = labels/labels.sum(axis = 1,keepdims = True)
-                labels[np.isnan(labels)] = 1/150
+                labels[np.isnan(labels)] = 1/num_classes
                 pcd_tree = o3d.geometry.KDTreeFlann(gt_pcd)
                 points = np.asarray(pcd.points)
                 gt_points = np.asarray(gt_pcd.points)
@@ -377,7 +392,7 @@ def compute_brier_scores():
                 for i in range(points.shape[0]):
                     [k, idx, dist] = pcd_tree.search_knn_vector_3d(points[i],1)
                     scrambler[i] = idx[0]
-                labels[labels.sum(axis =1)==0] = 1/150.0
+                labels[labels.sum(axis =1)==0] = 1/101.0
                 # this_stage_labels = deepcopy(gt_labels)
                 # this_stage_labels[:] = 1/21.0
                 # this_stage_labels[scrambler] = labels

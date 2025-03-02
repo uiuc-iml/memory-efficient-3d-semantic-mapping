@@ -41,7 +41,7 @@ from experiment_setup import Experiment_Generator
 from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_smaller_test_scenes, get_small_test_scenes2, get_fixed_train_and_val_splits, get_scannetpp_test_scenes
 from utils.sens_reader import scannet_scene_reader, ScanNetPPReader
 
-processes = 1
+processes = 2
 
 
 
@@ -61,7 +61,7 @@ def save_plot(data, ylabel, title, filename):
     plt.close()
 
 
-def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
+def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle, n_labels = 101):
     # iteration_times = []
     # segmentation_times = []
     reconstruction_times = []
@@ -73,16 +73,18 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
     # # plot_dir = os.path.join(des, 'topk')
     arr_dir = os.path.join(arr_des, f'{experiment_name}')
     if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
+        print("Here")
         k = experiment_settings['k']
         arr_dir = os.path.join(arr_des, f'{experiment_name}{k}')
-    
+    print(arr_dir)
     # # if not os.path.exists(plot_dir):
     # #     os.makedirs(plot_dir)
     if not os.path.exists(arr_dir):
+        print("Here2")
         os.makedirs(arr_dir)
 
 
-    EG = Experiment_Generator(n_labels=150)
+    EG = Experiment_Generator(n_labels=n_labels)
     # EG = Experiment_Generator(n_labels=21)
     fnames = get_filenames()
     rec,model = EG.get_reconstruction_and_model(experiment = experiment_settings,process_id = multiprocessing.current_process()._identity[0])
@@ -103,6 +105,11 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
     #     root_dir = "/scratch/bbuq/jcorreiamarques/3d_calibration/scannet_v2"
     root_dir = fnames['ScanNetpp_root_dir']
     # root_dir = fnames['ScanNet_root_dir']
+    if experiment_settings['segmentation'] == "Maskformer":
+        fnames['results_dir'] = "/work/hdd/bebg/results/scannetpp_ade20k"
+    elif experiment_settings['segmentation'] == "FineMaskformer":
+        fnames['results_dir'] = "/work/hdd/bebg/results/scannetpp"
+
     savedir = "{}/{}/".format(fnames['results_dir'], experiment_name)
     if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
         k1 = experiment_settings['k']
@@ -186,7 +193,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle):
             # gpu_memory_usage_np = np.array(gpu_memory_usage)
             # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
             reconstruction_times_np = np.array(reconstruction_times)
-            np.save(os.path.join(arr_dir, "reconstruction_times.npy"), reconstruction_times_np)
+            # np.save(os.path.join(arr_dir, "reconstruction_times.npy"), reconstruction_times_np)
             del intrinsic
             del depth
         # save_plot(gpu_memory_usage, 'Memory Usage (GB)', 'GPU Memory Usage Over Iterations', os.path.join(plot_dir, 'gpu_memory_usage.png'))
@@ -247,6 +254,11 @@ def main():
     torch.set_float32_matmul_precision('medium')
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--integration", type=str, required=True, help="Integration method")
+    parser.add_argument("--segmentation", type=str, required=True, help="Segmentation method")
+    parser.add_argument("--k", type=int, required=True, help="Top-k value")
+    parser.add_argument("--num_labels", type=int, default=101, help="Number of labels")
+    
 
     parser.add_argument('--debug', action='store_true')
     parser.set_defaults(debug = False)
@@ -255,20 +267,32 @@ def main():
     parser.add_argument('--end', type=int, default=-1,
                         help="""starting Reconstruction""")
     args = parser.parse_args()
-    
+    experiment_settings = {
+        "integration": args.integration,
+        "segmentation": args.segmentation,
+        "k": args.k,
+        "calibration": "None",
+        "oracle": False,
+        "L": 0,
+        "epsilon": 1
+    }
+    num_labels = args.num_labels
+
         
-    experiments = get_experiments()
+    # experiments = get_experiments()
 
-    if(args.end == -1):
-        experiments_to_do = experiments[args.start:]
-    else:
-        experiments_to_do = experiments[args.start:args.end]
-
+    # if(args.end == -1):
+    #     experiments_to_do = experiments[args.start:]
+    # else:
+    #     experiments_to_do = experiments[args.start:args.end]
+    experiment_name = f"{args.segmentation} {args.integration}"
+    print(experiment_name)
+    experiments_to_do = [experiment_name]
     print('\n\n reconstructing {}\n\n'.format(experiments_to_do))
     for experiment in experiments_to_do:
         print(experiment)
         experiment_name = experiment
-        experiment_settings = json.load(open('../settings/reconstruction_experiment_settings/{}.json'.format(experiment),'rb'))
+        # experiment_settings = json.load(open('../settings/reconstruction_experiment_settings/{}.json'.format(experiment),'rb'))
         experiment_settings.update({'experiment_name':experiment_name})
         import multiprocessing
         debug = args.debug
@@ -283,7 +307,7 @@ def main():
         p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
 
         res = []
-        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle),selected_scenes_pp,chunksize = 1), total= len(selected_scenes_pp),position = 0,desc = 'tot_scenes'):
+        for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = experiment_name,experiment_settings=experiment_settings,debug = debug,oracle = oracle, n_labels=num_labels),selected_scenes_pp,chunksize = 1), total= len(selected_scenes_pp),position = 0,desc = 'tot_scenes'):
                 res.append(a)
 
         

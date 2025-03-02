@@ -1,5 +1,5 @@
 {
-"results_dir":"/work/hdd/bebg/results/scannetpp",
+"results_dir":"/work/hdd/bebg/results/scannetpp_ade20k",
 "results_bs3d_dir":"/work/hdd/bebg/results/bs3d",
 "ScanNet_root_dir":"/home/motion/Data/scannet_v2",
 "ScanNetpp_root_dir":"/work/hdd/bebg/data/scannet_pp",

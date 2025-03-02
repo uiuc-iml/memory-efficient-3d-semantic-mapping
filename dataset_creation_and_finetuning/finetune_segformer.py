@@ -159,7 +159,7 @@ model =  SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b4-f
 
 model.train()
 for param in model.parameters():
-    param.requires_grad = False
+    param.requires_grad = True
 decoder_head = model.decode_head
 decoder_head.classifier = nn.Conv2d(768,N_CLASSES,kernel_size=(1, 1), stride=(1, 1))
 for param in decoder_head.parameters():
@@ -348,12 +348,12 @@ weights = op(np.array([3.5929339e+00, 4.3877968e+01, 6.9125867e+00, 1.0403013e+0
 epochs = 10000
 # lr = 0.001
 # batch_size = 50000
-batch_size = 20
+batch_size = 8
 
 if(parallel):
     model_name = "ScanNet Finetuned SegFormer DICE - validation subsample multi-gpu {} - LR {:.2e} - {}".format(loss_weights,lr,gpu)
 else:
-    model_name = "ScanNet Finetuned SegFormer DICE - validation subsample {} LR {:.2e} - {}".format(loss_weights,lr,gpu)
+    model_name = "ScanNet All Finetuned SegFormer DICE - validation subsample {} LR {:.2e} - {}".format(loss_weights,lr,gpu)
 
 model_name = model_name.replace('.','_')
 
@@ -373,7 +373,7 @@ if(not parallel):
         eval_steps=400,
         logging_steps=1,
         eval_accumulation_steps=1,
-        gradient_accumulation_steps = 2,
+        gradient_accumulation_steps = 3,
         load_best_model_at_end=True,
         metric_for_best_model='loss',
         dataloader_num_workers = 8,

@@ -30,7 +30,7 @@ class scanentpp_gt_getter:
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
         classes = merge.loc[:,'Segformer class Index'].values
-        classes = np.nan_to_num(classes,150).astype(int)
+        classes = np.nan_to_num(classes,100).astype(int)
         # classes = classes.reshape((classes.shape[0], 1))
         return pcd,classes
     
