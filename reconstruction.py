@@ -1800,7 +1800,7 @@ class topkhistMisraGries(Reconstruction):
             (o3c.float32, o3c.float32), ((1), (1)),
             self.voxel_size,self.res, 17500, self.device)
 
-    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
         k = self.k
         semantic_label = np.argmax(semantic_label, axis=2)
         semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
@@ -1843,8 +1843,12 @@ class topkhistMisraGries(Reconstruction):
             topk[fully_occupied_indices, 1:2 * k:2] -= 1   
             removal_mask = topk[fully_occupied_indices, 1:2 * k:2] <= 0
             if removal_mask.any():
-                topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
-                topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
+                removal_voxels, removal_slots = torch.where(removal_mask)  # Get voxel and slot indices
+                topk[fully_occupied_indices[removal_voxels], 2 * removal_slots] = empty_placeholder
+                topk[fully_occupied_indices[removal_voxels], 2 * removal_slots + 1] = 0
+
+                # topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
+                # topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
 
         o3d.core.cuda.synchronize()
         o3d.core.cuda.release_cache()
@@ -1923,7 +1927,7 @@ class topkhistKH(Reconstruction):
             self.voxel_size,self.res, 17500, self.device)
 
 
-    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight):
+    def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
         k = self.k
         semantic_label = np.argmax(semantic_label, axis=2)
         semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
