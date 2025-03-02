@@ -1970,8 +1970,12 @@ class topkhistKH(Reconstruction):
             topk[fully_occupied_indices, 1:2 * k:2] -= 1  # Decrement all stored classes by 1
             removal_mask = topk[fully_occupied_indices, 1:2 * k:2] <= 0
             if removal_mask.any():
-                topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
-                topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
+                # topk[fully_occupied_indices[removal_mask], 0:2 * k:2] = empty_placeholder
+                # topk[fully_occupied_indices[removal_mask], 1:2 * k:2] = 0
+                removal_voxels, removal_slots = torch.where(removal_mask)  # Get voxel and slot indices
+                topk[fully_occupied_indices[removal_voxels], 2 * removal_slots] = empty_placeholder
+                topk[fully_occupied_indices[removal_voxels], 2 * removal_slots + 1] = 0
+
 
         o3d.core.cuda.synchronize()
         o3d.core.cuda.release_cache()
