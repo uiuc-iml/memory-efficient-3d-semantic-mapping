@@ -12,7 +12,7 @@ sys.path.append(parent_dir)
 
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
-from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction
+from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction, topkhistMisraGries, topkhistKH
 from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter, FineMaskformerSegmenter
 from utils.clipfeatures import ClipFeatureExtractor
 
@@ -52,7 +52,7 @@ class Experiment_Generator:
         return rec,model
     
     def get_reconstruction(self,calibration,integration,segmentation,oracle,epsilon,L,learned,k2):
-        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized', 'topk', 'Encoded Averaging'],"Integration choice {} is not yet a valid choice".format(integration)
+        assert integration in ['Bayesian Update','Naive Bayesian','Naive Averaging','Averaging','Geometric Mean','Histogram','Generalized', 'topk', 'Encoded Averaging', 'MisraGries', 'topk KH'],"Integration choice {} is not yet a valid choice".format(integration)
         assert calibration in ['None','2D Temperature Scaling','3D Temperature Scaling','2D Vector Scaling','3D Vector Scaling','VEDE','Informed VEDE','Learned'],"Calibration choice {} is not yet a valid choice".format(calibration)
         if(learned is not None):
             temperature_file = learned['temperature']

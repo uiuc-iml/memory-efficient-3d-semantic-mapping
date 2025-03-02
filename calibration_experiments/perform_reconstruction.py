@@ -72,7 +72,8 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle, n_
     arr_des = '/work/hdd/bebg/results/visuals/{}/'.format(scene)
     # # plot_dir = os.path.join(des, 'topk')
     arr_dir = os.path.join(arr_des, f'{experiment_name}')
-    if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
+    technique = experiment_settings['integration']
+    if(technique == "topk" or technique == "Encoded Averaging"):
         print("Here")
         k = experiment_settings['k']
         arr_dir = os.path.join(arr_des, f'{experiment_name}{k}')
@@ -92,9 +93,9 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle, n_
     if(experiment_settings['segmentation'] == "CLIP"):
         get_semantics = model.get_pixel_features
     else:
-        if(experiment_settings['integration'] == 'Generalized'):
+        if(technique == 'Generalized'):
             get_semantics = model.get_raw_logits
-        # elif(experiment_settings['integration'] == 'Histogram'):
+        # elif(technique == 'Histogram'):
         #     get_semantics = model.classify
         else:
             get_semantics = model.get_pred_probs
@@ -111,7 +112,8 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle, n_
         fnames['results_dir'] = "/work/hdd/bebg/results/scannetpp"
 
     savedir = "{}/{}/".format(fnames['results_dir'], experiment_name)
-    if(experiment_settings['integration'] == "topk" or experiment_settings['integration'] == "Encoded Averaging"):
+    
+    if(technique == "topk" or technique == "Encoded Averaging" or technique == "MisraGries" or technique == "topk KH"):
         k1 = experiment_settings['k']
         savedir = "{}/{}/".format(fnames['results_dir'], f'{experiment_name}{k}')
     
