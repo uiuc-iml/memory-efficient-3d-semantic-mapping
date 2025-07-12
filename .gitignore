@@ -167,3 +167,6 @@ cython_debug/
 *.ckpt
 *.bin
 *.p
+
+# videos
+*.mp4
