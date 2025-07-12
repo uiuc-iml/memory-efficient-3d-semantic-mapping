@@ -1,26 +1,19 @@
 {"experiments":[
-"FineMaskformer topk2",
-"FineMaskformer topk4",
-"FineMaskformer topk8",
-"FineMaskformer Histogram",
-"FineMaskformer Encoded Averaging2",
-"FineMaskformer Encoded Averaging4",
-"FineMaskformer Encoded Averaging8",
-"FineMaskformer Naive Averaging",
-"FineMaskformer Naive Bayesian"
-
+"FineMaskformer MisraGries2",
+"FineMaskformer MisraGries4",
+"FineMaskformer MisraGries8",
+"FineMaskformer topk KH2",
+"FineMaskformer topk KH4",
+"FineMaskformer topk KH8"
 
 ],
 "short_names":[
-"FineMaskformer topk2",
-"FineMaskformer topk4",
-"FineMaskformer topk8",
-"FineMaskformer Histogram",
-"FineMaskformer Encoded Averaging2",
-"FineMaskformer Encoded Averaging4",
-"FineMaskformer Encoded Averaging8",
-"FineMaskformer Naive Averaging",
-"FineMaskformer Naive Bayesian"
+"FineMaskformer MisraGries2",
+"FineMaskformer MisraGries4",
+"FineMaskformer MisraGries8",
+"FineMaskformer topk KH2",
+"FineMaskformer topk KH4",
+"FineMaskformer topk KH8"
 
 ]
 }

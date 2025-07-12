@@ -1855,7 +1855,7 @@ class topkhistMisraGries(Reconstruction):
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
 
-    def extract_point_cloud(self):
+    def extract_point_cloud(self, return_raw_logits=False):
         pcd = self.vbg.extract_point_cloud().to_legacy()
         target_points = np.asarray(pcd.points)
         if self.semantic_integration:
@@ -1875,8 +1875,17 @@ class topkhistMisraGries(Reconstruction):
                 a[np.repeat(np.arange(topk.shape[0]), self.k)[valid_mask], valid_class_indices] = valid_class_counts
                 valid_sums_mask = sums.flatten() > 0
                 a[valid_sums_mask] /= sums[valid_sums_mask]
-                a[~valid_sums_mask] = 1.0 / self.n_labels
-                return pcd, a.astype(np.float64)
+                # a[~valid_sums_mask] = 1.0 / self.n_labels
+                total_counts = (topk[:,-1]).cpu().numpy()
+                alphas = np.zeros_like(total_counts, dtype=np.float64)
+                valid_mask = total_counts != 0
+                alphas[valid_mask] = (sums.flatten())[valid_mask] / total_counts[valid_mask]
+                uniform_dist = np.full_like(a,(1.0)/(self.n_labels))
+                a = ((a.T * alphas) + (uniform_dist.T * (1-alphas))).T
+                if return_raw_logits:
+                    return pcd, a.astype(np.float64)
+                else:
+                    return pcd, a.astype(np.float64)
             else:
                 return None, None
         else:
@@ -1940,7 +1949,7 @@ class topkhistKH(Reconstruction):
         topsemanticlabel_torch = torch.utils.dlpack.from_dlpack(topsemanticlabel.to_dlpack())
         valid_voxel_indices_torch = torch.utils.dlpack.from_dlpack(valid_voxel_indices.to_dlpack())
 
-        topk[valid_voxel_indices_torch, 2 * k] += 1     # Remove the total count later 
+        topk[valid_voxel_indices_torch, 2 * k] += 1     # for convinience later 
         ntopk = topk[valid_voxel_indices_torch, 0:2 * k:2]
         match_mask = (ntopk == topsemanticlabel_torch.reshape(-1, 1))
         has_match = torch.any(match_mask, dim=1)
@@ -1982,7 +1991,7 @@ class topkhistKH(Reconstruction):
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
 
-    def extract_point_cloud(self):
+    def extract_point_cloud(self, return_raw_logits=False):
         pcd = self.vbg.extract_point_cloud().to_legacy()
         target_points = np.asarray(pcd.points)
         if self.semantic_integration:
@@ -2002,7 +2011,14 @@ class topkhistKH(Reconstruction):
                 a[np.repeat(np.arange(topk.shape[0]), self.k)[valid_mask], valid_class_indices] = valid_class_counts
                 valid_sums_mask = sums.flatten() > 0
                 a[valid_sums_mask] /= sums[valid_sums_mask]
-                a[~valid_sums_mask] = 1.0 / self.n_labels
+                # a[~valid_sums_mask] = 1.0 / self.n_labels
+                total_counts = (topk[:,-1]).cpu().numpy()
+                alphas = np.zeros_like(total_counts, dtype=np.float64)
+                valid_mask = total_counts != 0
+                alphas[valid_mask] = ((sums.flatten())[valid_mask]) / (self.k * total_counts[valid_mask])
+                uniform_dist = np.full_like(a,(1.0)/(self.n_labels))
+                a = ((a.T * alphas) + (uniform_dist.T * (1-alphas))).T
+
                 return pcd, a.astype(np.float64)
             else:
                 return None, None

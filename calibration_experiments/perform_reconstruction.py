@@ -115,7 +115,7 @@ def reconstruct_scene(scene,experiment_name,experiment_settings,debug,oracle, n_
     
     if(technique == "topk" or technique == "Encoded Averaging" or technique == "MisraGries" or technique == "topk KH"):
         k1 = experiment_settings['k']
-        savedir = "{}/{}/".format(fnames['results_dir'], f'{experiment_name}{k}')
+        savedir = "{}/{}/".format(fnames['results_dir'], f'{experiment_name}{k1}')
     
     
     # savedir = '/scratch/bbuq/jcorreiamarques/3d_calibration/Results/{}/'.format(experiment_name)
