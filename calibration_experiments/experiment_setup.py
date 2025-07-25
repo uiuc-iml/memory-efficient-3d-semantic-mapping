@@ -12,7 +12,7 @@ sys.path.append(parent_dir)
 
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
-from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction, topkhistMisraGries, topkhistKH
+from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, AveragedEncodedReconstruction, topkhistMisraGries, topkhistKH
 from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, Segformer150Segmenter, Segformer101Segmenter, FineTunedESANet
 from utils.clipfeatures import ClipFeatureExtractor
 
@@ -64,8 +64,8 @@ class Experiment_Generator:
         elif(integration in ['Averaging','Naive Averaging']):
             rec = ProbabilisticAveragedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
-        elif(integration == 'Encoded Averaging'):
-            rec = ProbabilisticAveragedEncodedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
+        elif(integration == 'EF'):
+            rec = AveragedEncodedReconstruction(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu, encoded_dim=self.k)
         elif(integration == 'Histogram'):
             rec = HistogramReconstruction16(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
@@ -73,7 +73,7 @@ class Experiment_Generator:
         elif(integration == 'Geometric Mean'):
             rec = GeometricBayes(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu)
-        elif(integration == 'topk'):
+        elif(integration == 'CTKH'):
             rec = topkhist(depth_scale =self.depth_scale,depth_max=self.depth_max,res =self.res,voxel_size =self.voxel_size,n_labels =self.n_labels,integrate_color = False,
             device = o3d.core.Device(self.o3d_device),miu =self.miu,k1 = k2)
         elif(integration == 'MisraGries'):

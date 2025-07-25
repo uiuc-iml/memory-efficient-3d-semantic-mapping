@@ -31,20 +31,15 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
 
 
-from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes, get_small_test_scenes2, h5pyscenes, get_scannetpp_test_scenes, get_scannetpp_train_scenes
-from reconstruction import GroundTruthGenerator, Reconstruction
-from utils.sens_reader import scannet_scene_reader, ScanNetPPReader 
-
-
-
-
-
+from utils.ScanNet_scene_definitions import get_filenames, get_larger_test_and_validation_scenes
+from reconstruction import GroundTruthGenerator
+from utils.sens_reader import scannet_scene_reader
 
 processes = 4
 faulthandler.enable()
 
 
-def reconstruct_scene(scene,experiment_name,dataset):
+def reconstruct_scene(scene,experiment_name):
 
 
     fnames = get_filenames()
@@ -56,21 +51,13 @@ def reconstruct_scene(scene,experiment_name,dataset):
     depth_max = 5.0
     miu = 0.001
 
-    # rec = GroundTruthGenerator(depth_scale=depth_scale,depth_max = depth_max, 
-    #     res = res,voxel_size = voxel_size,trunc_multiplier=trunc_multiplier,
-    #         n_labels=n_labels,integrate_color=False,miu = miu)
-    rec = Reconstruction(depth_scale=depth_scale,depth_max = depth_max, 
+    rec = GroundTruthGenerator(depth_scale=depth_scale,depth_max = depth_max,
         res = res,voxel_size = voxel_size,trunc_multiplier=trunc_multiplier,
-            n_labels=None,integrate_color=False,miu = miu)
+            n_labels=n_labels,integrate_color=False,miu = miu)
 
 
-    if dataset == "scannet++":
-        root_dir = fnames['ScanNetpp_root_dir']
-    elif dataset == "scannet":
-        root_dir = fnames['ScanNet_root_dir']
-
+    root_dir = fnames['ScanNet_root_dir']
     savedir = "{}/{}/".format(fnames['results_dir'],experiment_name)
-    # savedir = '/scratch/bbuq/jcorreiamarques/3d_calibration/Results/{}/'.format(experiment_name)
     if(not os.path.exists(savedir)):
         try:
             os.mkdir(savedir)
@@ -88,11 +75,9 @@ def reconstruct_scene(scene,experiment_name,dataset):
     try:
         device = o3d.core.Device('CUDA:0')
 
-        if dataset == "scannet++":
-            my_ds = ScanNetPPReader(root_dir, scene)
-        elif dataset == "scannet":
-            my_ds = scannet_scene_reader(root_dir, scene)
 
+
+        my_ds = scannet_scene_reader(root_dir, scene ,lim = lim,disable_tqdm = True)
         total_len = len(my_ds)
 
         if(lim == -1):
@@ -115,14 +100,12 @@ def reconstruct_scene(scene,experiment_name,dataset):
             try:
                 intrinsic = o3c.Tensor(data_dict['intrinsics_depth'][:3,:3].astype(np.float64))
                 depth = o3d.t.geometry.Image(depth).to(device)
-                # semantic_label_gt = cv2.resize(data_dict['semantic_label'],(depth.columns,depth.rows),interpolation= cv2.INTER_NEAREST)
+                semantic_label_gt = cv2.resize(data_dict['semantic_label'],(depth.columns,depth.rows),interpolation= cv2.INTER_NEAREST)
             except Exception as e: 
                 print(e)
                 continue
-            # rec.update_vbg(data_dict['depth'],data_dict['intrinsics_depth'][:3,:3].astype(np.float64),
-            #             data_dict['pose'],semantic_label = semantic_label_gt)
             rec.update_vbg(data_dict['depth'],data_dict['intrinsics_depth'][:3,:3].astype(np.float64),
-                        data_dict['pose'])
+                        data_dict['pose'],semantic_label = semantic_label_gt)
 
             del intrinsic
             del depth
@@ -144,17 +127,11 @@ def reconstruct_scene(scene,experiment_name,dataset):
 def main():
     import torch
     import multiprocessing
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset")
-    args = parser.parse_args()
-    if args.dataset == "scannet++":
-        test_scenes = get_scannetpp_test_scenes()
-    elif args.dataset == "scannet":
-        test_scenes = get_larger_test_and_validation_scenes()
-    
 
     torch.set_float32_matmul_precision('medium')
-    selected_scenes = sorted(test_scenes)
+    val_scenes,test_scenes = get_larger_test_and_validation_scenes()
+    # test_scenes = get_learned_calibration_validation_scenes()
+    selected_scenes = sorted(test_scenes+val_scenes)
     p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
     res = []
     for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = 'reconstruction_gts'),selected_scenes,chunksize = 1), total= len(selected_scenes),position = 0,desc = 'tot_scenes'):

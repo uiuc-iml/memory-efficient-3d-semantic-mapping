@@ -1,9 +1,9 @@
 {
-	"integration": "topk",
+	"integration": "CTKH",
 	"calibration": "None",
 	"oracle": false,
 	"L": 0,
 	"epsilon": 1,
-	"segmentation": "Segformer",
-    "k": 4
+	"segmentation": "Segformer150",
+    "k": 2
 }

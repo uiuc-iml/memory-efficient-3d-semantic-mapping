@@ -1210,7 +1210,7 @@ import torch.utils.dlpack
 import lightning as L
 from litautoencoder import LitAutoEncoder, Encoder, Decoder
 
-class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
+class AveragedEncodedReconstruction(Reconstruction):
     def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,encoded_dim=4):
         self.encoded_dim = encoded_dim
         if n_labels == 101:

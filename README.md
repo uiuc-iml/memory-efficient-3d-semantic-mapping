@@ -45,19 +45,29 @@ Refer to the instructions below to reproduce our experimental results as well as
 cd calibration_experiments
 python perform_reconstruction.py --dataset "scannet++"
 ```
-Use the argument "scannet" for ScanNet, "scannet++" for ScanNet++, and "bs3d" for BS3D.
+Use the argument "scannet" for ScanNet, "scannet++" for ScanNet++, and "bs3d" for BS3D.  
 This script will also save per scene memory usage and update times plots in results_dir/{experiment_name}/visuals/.
 
-3. Create the ground truth reconstructions:
+3. Create the ground truth reconstructions (Only required for ScanNet):
 ```bash
 cd ../dataset_creating_and_finetuning
-python create_reconstruction_gts.py --dataset "scannet++"
+python create_reconstruction_gts.py
 ```
 Note that only ScanNet and ScanNet++ have ground truth annotations.
 
 4. Run the evaluation script:
 ```bash
 cd ../calibration_experiments
-python run_full_eval.py --dataset "scannet++"
+python run_full_eval_scannet.py # or python run_full_eval_scannetpp.py
 ```
 This will output the results in {results_dir}/quant_eval.
+
+## Running semantic reconstructions for specific scenes and semantic fusion
+1. Example
+```bash
+python perform_reconstruction.py --dataset "bs3d" --scene "dining" --integration "CTKH" --k 4
+```
+
+Note: `--integration` must be one of `["CTKH", "Naive Averaging", "Naive Bayesian", "Histogram", "EF"]`k` is valid for CTKH and EF only.
+This will write the point cloud, label file and the plots for VRAM usage and update times in the results_dir you specify in settings/directory_definitions.json.
+

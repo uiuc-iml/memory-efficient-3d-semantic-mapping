@@ -23,10 +23,6 @@ def get_scannetpp_test_scenes():
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
-    # return sorted(['c5f701a8c7', 'c856c41c99', 'cf1ffd871d', 'd6cbe4b28b', 'd7abfc4b17', 'd918af9c5f', 'e0de253456', 'e7ac609391', 'e8ea9b4da8', 
-    #                 'eb4bc76767', 'ef69d58016', 'f248c2bcdc', 'fd361ab85f'])
-    # return sorted(['a08d9a2476', 'c0f5742640',  'bb87c292ad','e7ac609391', 'fd361ab85f', 'ef69d58016', '8133208cb6', 'd7abfc4b17'])
-    # return sorted(['45ba9ea301'])
     print(sorted(scenes[0:10]))
     # return sorted(scenes[0:2])
     return sorted(scenes)

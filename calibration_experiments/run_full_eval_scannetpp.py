@@ -10,7 +10,6 @@ import torch
 from torchmetrics.functional import jaccard_index
 from tqdm.notebook import tqdm
 import gc
-import argparse
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -38,10 +37,8 @@ no_void =  False
 fnames = get_filenames()
 
 results_dir = fnames['results_dir']
-if args.dataset == "scannet++":
-    num_classes = 101
-elif args.dataset == "scannet":
-    num_classes = 21
+num_classes = 101
+        
 
 def get_experiments_and_short_names():
     a = json.load(open('../settings/experiments_and_short_names.json','r'))
@@ -53,17 +50,10 @@ def compute_mIoUs():
     accuracies = []
     experiments,short_names = get_experiments_and_short_names()
     
-    
-    # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
-    # test_scenes = get_larger_test_and_validation_scenes()
-    if args.dataset == "scannet++":
-        test_scenes = get_scannetpp_test_scenes()
-    elif args.dataset == "scannet":
-        test_scenes = get_larger_test_and_validation_scenes()
+    test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    if args.dataset == "scannet++":
-        gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
 
     pcds_template = '{}/{}/{}/*.pcd'
     labels_template = '{}/{}/{}/labels*.p'
@@ -310,36 +300,6 @@ def compute_mECEs():
     
     
     
-    # import seaborn as sns
-    # sns.set_theme()
-    # for i,c in tqdm(enumerate(classes[:21])):
-    #     fig,axis = plt.subplots(1,len(experiments))
-
-    #     for experiment,short_name in tqdm(zip(experiments,short_names)):
-    #         ax = axis[experiments.index(experiment)]
-    #         cc = all_cals[experiment].cals[i]
-    #         cal,conf,lims = cc.return_calibration_results()
-    #         lims = lims-0.05
-    #         cal = cc.correct_bin_members/cc.total_bin_members
-    #         cal = np.nan_to_num(cal,0)
-    # #         fig, ax = plt.subplots()
-    #         fig.set_size_inches(len(experiment)*8,8)
-    #         p1 = ax.bar(x= lims, height = cal,  width = 0.8*(lims[1]-lims[0]),color = 'b',alpha = 0.5)
-    #         ax.bar(x= lims, height = conf, width = 0.8*(lims[1]-lims[0]),color = 'r',alpha = 0.2)
-    #         ax.plot(np.arange(11)/10,np.arange(11)/10)
-    #         membership = (cc.total_bin_members/cc.total_bin_members.sum()*100)
-    #         membership = np.round(membership,decimals = 1)
-    #         membership = ['(' +str(i) + '%)' for i in membership]
-
-    #         # membership = eval(np.array_str(membership, precision=2, suppress_small=True))
-    #         ax.bar_label(p1, labels = membership,label_type='edge')
-    #         ax.set_title('{} - {} - ECE = {:.3f}'.format(short_name,c,cc.get_ECE()))
-    #         ax.set_xlabel('Upper Confidence')
-    #         ax.set_ylabel('Empirical Accuracy within bin (total pixel %)')
-    #     plt.savefig('{}/mECE Analysis/plots/Segformer3/Rel_diagrams_by_experiment_{}.png'.format(results_dir,c),bbox_inches = 'tight')
-    #     plt.show()
-
-
 
 
 def compute_brier_scores():
@@ -447,21 +407,18 @@ def compute_brier_scores():
 
 from multiprocessing import Process
 
-# p1 = Process(target = compute_mIoUs)
-# p2 = Process(target = compute_mECEs)
-# p3 = Process(target = compute_brier_scores)
+p1 = Process(target = compute_mIoUs)
+p2 = Process(target = compute_mECEs)
+p3 = Process(target = compute_brier_scores)
 # compute_mIoUs()
 # compute_brier_scores()
-# p1.start()
-# p2.start()
-# p3.start()
-# p1.join()
-# p2.join()
-# p3.join()
-parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", type=str, required=True, help="Dataset")
-args = parser.parse_args()
-compute_mIoUs()
-compute_mECEs()
-compute_brier_scores()
+p1.start()
+p2.start()
+p3.start()
+p1.join()
+p2.join()
+p3.join()
+# compute_mIoUs()
+# compute_mECEs()
+# compute_brier_scores()
 
