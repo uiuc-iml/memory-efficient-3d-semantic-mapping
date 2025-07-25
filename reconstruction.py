@@ -151,18 +151,9 @@ class Reconstruction:
         self.initialize_vbg()
         self.rays = None
         self.torch_device = torch.device('cuda')
-        # self.arr_des = '/home/motion/semanticmapping/visuals/arrays/280b83fcf3/cacherelease'
-        # # plot_dir = os.path.join(des, 'topk')
-        # self.arr_dir = os.path.join(self.arr_des, f'reconstruction')
-        # arr_dir = os.path.join(arr_des, f'scannetpp_Segformer_150_topk1')
-        # # if not os.path.exists(plot_dir):
-        # #     os.makedirs(plot_dir)
-        # if not os.path.exists(self.arr_dir):
-        #     os.makedirs(self.arr_dir)
         self.block_count = []
         self.total_blocks = []
         self.hashmap_size = []
-        # self.gpu_memory_usage = []
 
 
 
@@ -296,78 +287,6 @@ class Reconstruction:
         o3d.core.cuda.synchronize()
         
     def update_semantics(self,semantic_label,v_proj,u_proj,valid_voxel_indices,mask_inlier,weight, scene=None):
-        # performing semantic integration
-        #  Laplace Smoothing of the observation
-        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-        # arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease'
-        # plot_dir = os.path.join(des, "Maskformer Geometric Mean")
-        # self.arr_dir = os.path.join(arr_des, "Maskformer Naive Bayesian")
-        # if not os.path.exists(plot_dir):
-        #     os.makedirs(plot_dir)
-        # if not os.path.exists(self.arr_dir):
-        #     os.makedirs(self.arr_dir)
-        
-        # print(type(semantic_label))
-        # semantic_label += self.miu
-        # renormalizer = 1+self.miu*self.n_labels
-        # semantic_label = semantic_label/renormalizer
-        # # print(type(semantic_label))
-        # # print(type(self.miu))
-        # a_b1 = self.vbg.hashmap()
-        # a_b = a_b1.active_buf_indices()
-        # self.block_count.append(len(a_b))
-        # block_count_np = np.array(self.block_count)
-        # np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
-        # # # # print(b_c)
-        # hs = a_b1.size()
-        # self.hashmap_size.append(hs)
-        # hashmap_size_np = np.array(self.hashmap_size)
-        # np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
-        # tb = a_b1.capacity()
-        # self.total_blocks.append(tb)
-        # total_blocks_np = np.array(self.total_blocks)
-        # np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
-        
-        
-        
-
-        # semantic_label = np.log(semantic_label)
-
-        # semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
-        
-        # semantic_readings = semantic_image.as_tensor()[v_proj,
-        #                                 u_proj].to(o3c.float32)
-        # semantic = self.vbg.attribute('label').reshape((-1, self.n_labels))
-        # # initializing previously unobserved voxels with uniform prior
-        # semantic[valid_voxel_indices[weight[valid_voxel_indices].flatten() == 0]] += o3c.Tensor(np.log(np.array([1.0/self.n_labels])).astype(np.float32)).to(self.device)
-        # #Bayesian update in log space    
-        # semantic[valid_voxel_indices] = semantic[valid_voxel_indices]+semantic_readings[mask_inlier]
-        # # semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
-        # # semantic_image_torch = torch.utils.dlpack.from_dlpack(semantic_image.to_dlpack())
- 
-        # # semantic_image_torch += self.miu
-        # # renormalizer = 1+self.miu*self.n_labels
-        # # semantic_image_torch /= renormalizer
- 
-        # # semantic_image_torch[:,:] = torch.log(semantic_image_torch)
-       
-        # # semantic_readings = semantic_image.as_tensor()[v_proj,
-        # #                                 u_proj].to(o3c.float32)
-        # # semantic = self.vbg.attribute('label').reshape((-1, self.n_labels))
-        # # # initializing previously unobserved voxels with uniform prior
-        # # semantic[valid_voxel_indices[weight[valid_voxel_indices].flatten() == 0]] += o3c.Tensor(np.log(np.array([1.0/self.n_labels])).astype(np.float32)).to(self.device)
-        # # #Bayesian update in log space   
-        # # semantic[valid_voxel_indices] = semantic[valid_voxel_indices]+semantic_readings[mask_inlier]
-
-
-
-
-        # o3d.core.cuda.synchronize()
-        # # gpu_memory_usage.append(get_gpu_memory_usage())
-        # # gpu_memory_usage_np = np.array(gpu_memory_usage)
-        # # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
-
-        # o3d.core.cuda.release_cache()
         semantic_label_o3d = o3c.Tensor(semantic_label, dtype=o3c.float32, device=self.device)
         semantic_label_torch = torch.utils.dlpack.from_dlpack(semantic_label_o3d.to_dlpack())
 
@@ -375,9 +294,7 @@ class Reconstruction:
         renormalizer = 1 + self.miu * self.n_labels
         semantic_label_torch /= renormalizer
 
-        
-        
-        # Perform log operation using PyTorch
+        # Perform log operation 
         semantic_label_torch = torch.log(semantic_label_torch)
 
         # Convert back to Open3D tensor from PyTorch
@@ -405,9 +322,6 @@ class Reconstruction:
         o3d.core.cuda.synchronize()
 
         o3d.core.cuda.release_cache()
-
-
-
 
 
     def extract_point_cloud(self,return_raw_logits = False):
@@ -551,33 +465,6 @@ class ProbabilisticAveragedReconstruction(Reconstruction):
 
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
 
-        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-        # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/cacherelease'
-        # plot_dir = os.path.join(des, "Maskformer Naive Averaging")
-        # arr_dir = os.path.join(arr_des, "Maskformer Naive Averaging")
-        # if not os.path.exists(plot_dir):
-        #     os.makedirs(plot_dir)
-        # if not os.path.exists(arr_dir):
-        #     os.makedirs(arr_dir)
-        # print(self.arr_dir)
-        # a_b1 = self.vbg.hashmap()
-        # a_b = a_b1.active_buf_indices()
-        # self.block_count.append(len(a_b))
-        # block_count_np = np.array(self.block_count)
-        # np.save(os.path.join(self.arr_dir, "block_count.npy"), block_count_np)
-        # # print(b_c)
-        # hs = a_b1.size()
-        # self.hashmap_size.append(hs)
-        # hashmap_size_np = np.array(self.hashmap_size)
-        # np.save(os.path.join(self.arr_dir, "hashmap_size.npy"), hashmap_size_np)
-        # tb = a_b1.capacity()
-        # self.total_blocks.append(tb)
-        # total_blocks_np = np.array(self.total_blocks)
-        # np.save(os.path.join(self.arr_dir, "total_blocks.npy"), total_blocks_np)
-
-
-        semantic_label = semantic_label
-
         semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
         
         semantic_readings = semantic_image.as_tensor()[v_proj,
@@ -647,15 +534,6 @@ class HistogramReconstruction(GroundTruthGenerator):
     
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
 
-        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-        # arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease'
-        # plot_dir = os.path.join(des, "Maskformer Histogram")
-        # arr_dir = os.path.join(arr_des, "Maskformer Histogram")
-        # if not os.path.exists(plot_dir):
-        #     os.makedirs(plot_dir)
-        # if not os.path.exists(arr_dir):
-        #     os.makedirs(arr_dir)
-
         semantic_label = np.argmax(semantic_label,axis = 2)
         
         # semantic_label = torch.nn.functional.one_hot(torch.from_numpy(semantic_label.astype(np.int64)),num_classes = self.n_labels).numpy().astype(np.float32)
@@ -689,14 +567,6 @@ class topkhist(Reconstruction):
     def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,k1=4):
         self.k = k1
         super().__init__(depth_scale,depth_max,res,voxel_size,trunc_multiplier,n_labels,integrate_color,device,miu)
-        # self.arr_des = '/home/motion/semanticmapping/visuals/arrays/7e09430da7/cacherelease'
-        # # plot_dir = os.path.join(des, 'topk')
-        # self.arr_dir = os.path.join(self.arr_des, f'scannetpp_Segformer_150_topk1')
-        # arr_dir = os.path.join(arr_des, f'scannetpp_Segformer_150_topk1')
-        # # if not os.path.exists(plot_dir):
-        # #     os.makedirs(plot_dir)
-        # if not os.path.exists(self.arr_dir):
-        #     os.makedirs(self.arr_dir)
         self.block_count = []
         self.total_blocks = []
         self.hashmap_size = []
@@ -741,32 +611,6 @@ class topkhist(Reconstruction):
 
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene=None):
         k = self.k
-        # arr_des = f'/home/motion/semanticmapping/visuals/arrays/{scene}/cacherelease/Maskformer topk{k}'
-        # # plot_dir = os.path.join(des, 'topk')
-        # # arr_dir = os.path.join(arr_des, '4')
-        # arr_dir = arr_des
-        # # if not os.path.exists(plot_dir):
-        # #     os.makedirs(plot_dir)
-        # if not os.path.exists(arr_dir):
-        #     os.makedirs(arr_dir)
-        # try:
-        #     a_b1 = self.vbg.hashmap()
-        #     a_b = a_b1.active_buf_indices()
-        #     self.block_count.append(len(a_b))
-        #     block_count_np = np.array(self.block_count)
-        #     np.save(os.path.join(arr_dir, "block_count.npy"), block_count_np)
-        #     hs = a_b1.size()
-        #     self.hashmap_size.append(hs)
-        #     hashmap_size_np = np.array(self.hashmap_size)
-        #     np.save(os.path.join(arr_dir, "hashmap_size.npy"), hashmap_size_np)
-        #     tb = a_b1.capacity()
-        #     self.total_blocks.append(tb)
-        #     total_blocks_np = np.array(self.total_blocks)
-        #     np.save(os.path.join(arr_dir, "total_blocks.npy"), total_blocks_np)
-
-        #     # print(b_c)
-        # except Exception as e:
-        #     print(e)
 
         semantic_label = np.argmax(semantic_label, axis=2)
         semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
@@ -898,11 +742,7 @@ class topkhist(Reconstruction):
                 # Normalize if sums are greater than 0
                 valid_sums_mask = sums.flatten() > 0  # Shape: (num_points,)
                 a[valid_sums_mask] /= sums[valid_sums_mask]
-                # print(f'a:')
-                # print(a[3])
-
                 # combine with uniform distribution using alpha
-                
                 total_counts = (topk[:,-1]).cpu().numpy()
                 alphas = np.zeros_like(total_counts, dtype=np.float64)
                 valid_mask = total_counts != 0
@@ -942,7 +782,7 @@ class topkhist(Reconstruction):
         # Move vbg to CPU to reduce GPU memory usage
         # self.vbg = self.vbg.cpu()
         
-        # Extract point cloud from vbg (now on CPU)
+        # Extract point cloud from vbg 
         pcd = self.vbg.extract_point_cloud()
         pcd = pcd.to_legacy()
         target_points = np.asarray(pcd.points)
@@ -953,33 +793,19 @@ class topkhist(Reconstruction):
                 self.vbg, target_points, 'topkclassesandfreq',
                 res=self.res, voxel_size=self.voxel_size, device=o3d.core.Device("cuda:0")
             )
-            # get_properties(self.vbg,target_points,'topkclassesandfreq',res = self.res,voxel_size = self.voxel_size,device = self.device)
             
             if topk is not None:
                 # Extract the most probable class (classes[0]) for each point
                 most_probable_class = topk[:, 0].cpu().numpy()  # Shape: (num_points,)
-                
-                # Calculate confidence as topk[1] / topk[2]
-                # confidence = (topk[:, 1] / topk[:, 2]).numpy()  # Shape: (num_points,)
-                
+
                 if return_raw_logits:
                     return pcd, most_probable_class
-                
                 return pcd, most_probable_class
             
             else:
                 return None, None, None
         else:
             return pcd, None, None
-
-    
-
-
-
-
-
-
-
 
 
 class GroundTruthGenerator16(Reconstruction):
@@ -1384,49 +1210,7 @@ import torch.optim as optim
 import torch.utils.dlpack
 
 import lightning as L
-from litautoencoder import LitAutoEncoder
-from litautodecoder import LitAutoDecoder
-
-class Encoder(nn.Module):
-    def __init__(self, input_dim, encoded_dim):
-        super(Encoder, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 64)
-        self.fc4 = nn.Linear(64, encoded_dim)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
-        return x
-
-# Define the decoder MLP with four layers
-class Decoder(nn.Module):
-    def __init__(self, encoded_dim, output_dim):
-        super(Decoder, self).__init__()
-        self.fc1 = nn.Linear(encoded_dim, 64)
-        self.fc2 = nn.Linear(64, 128)
-        self.fc3 = nn.Linear(128, 256)
-        self.fc4 = nn.Linear(256, output_dim)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
-        x = F.softmax(x, dim=-1)
-        return x
-
-# encoded_dimension = 2
-# encoder_path = 'scannetpp_mseloss_weights/encoded_dim_2/na-epoch=11-val_loss=0.00024.ckpt'
-# encoder_model = LitAutoEncoder.load_from_checkpoint(encoder_path, encoder=Encoder(
-#     150, encoded_dimension), decoder=Decoder(encoded_dimension, 150))
-
-# # decoder_path = 'na-epoch=21-val_loss=0.00000.ckpt'
-# # decoder_model = LitAutoDecoder.load_from_checkpoint(decoder_path, encoder=Encoder(
-# #     21, 8), decoder=Decoder(8, 21))
+from litautoencoder import LitAutoEncoder, Encoder, Decoder
 
 class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
     def __init__(self,depth_scale = 1000.0,depth_max=5.0,res = 8,voxel_size = 0.025,trunc_multiplier = 8,n_labels = None,integrate_color = True,device = o3d.core.Device('CUDA:0'),miu = 0.001,encoded_dim=4):
@@ -1483,28 +1267,13 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
 
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene=None):
 
-        # des = "/home/motion/semanticmapping/visuals/maskformer_default"
-        # arr_des = '/home/motion/semanticmapping/visuals/arrays/scene0427_00/cacherelease'
-        # plot_dir = os.path.join(des, "Maskformer Naive Averaging")
-        # arr_dir = os.path.join(arr_des, "Maskformer Naive Averaging")
-        # if not os.path.exists(plot_dir):
-        #     os.makedirs(plot_dir)
-        # if not os.path.exists(arr_dir):
-        #     os.makedirs(arr_dir)
-
-
-
-        semantic_label = semantic_label
-
         semantic_image = o3d.t.geometry.Image(semantic_label).to(self.device)
         
         semantic_readings = semantic_image.as_tensor()[v_proj,
                                         u_proj].to(o3c.float32)
         semantic = self.vbg.attribute('encoded_vectors').reshape((-1, self.encoded_dim))
         semantic_weight = self.vbg.attribute('semantic_weight').reshape((-1))
-        # initializing previously unobserved voxels with uniform prior
-        #naive summing of probabilities
-        # semantic[valid_voxel_indices[weight[valid_voxel_indices].flatten() == 0]] += o3c.Tensor(np.array([1.0/self.n_labels]).astype(np.float32)).to(self.device)
+
         semantic_weight[valid_voxel_indices[weight[valid_voxel_indices].flatten() == 0]] += o3c.Tensor(0).to(o3c.float32).to(self.device)
         encodeinput = semantic_readings[mask_inlier]
 
@@ -1517,7 +1286,7 @@ class ProbabilisticAveragedEncodedReconstruction(Reconstruction):
             del encoded_obs_t
             torch.cuda.empty_cache()
 
-        #Bayesian update in log space    
+        # Bayesian update in log space    
         semantic[valid_voxel_indices] = (semantic_weight[valid_voxel_indices].reshape((-1,1))*semantic[valid_voxel_indices]+encoded_obs)/(semantic_weight[valid_voxel_indices].reshape((-1,1))+1)
         semantic_weight[valid_voxel_indices] += 1
         o3d.core.cuda.synchronize()

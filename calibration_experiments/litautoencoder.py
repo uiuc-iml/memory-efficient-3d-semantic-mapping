@@ -156,36 +156,3 @@ class LitAutoEncoder(L.LightningModule):
 
 
        
-
-
-
-# num_classes = 21
-# encoded_dim = 10
-
-
-# checkpoint_path = './checkpoints/lightning_logs/version_1/checkpoints/epoch=44-step=11250.ckpt'
-# checkpoint = torch.load(checkpoint_path)
-# # print(checkpoint.keys())
-# # weights = checkpoint['state_dict']
-# # print(weights.keys())
-# # encoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if k.startswith("encoder.")}
-# # decoder_weights = {k: v for k, v in checkpoint["state_dict"].items() if k.startswith("decoder.")}
-
-
-# model = LitAutoEncoder.load_from_checkpoint(checkpoint_path, encoder=Encoder(num_classes, encoded_dim), decoder=Decoder(encoded_dim, num_classes))
-# rng = np.random.default_rng()
-# n_classes = 21
-# mean = rng.dirichlet(0.05*np.ones(n_classes))
-# # print(mean)
-# alphas = np.clip((mean*10),0.001,20)
-# # print(alphas)
-# means = torch.Tensor(rng.dirichlet(alphas, 100)).to(device)
-# origmeans = torch.mean(means, axis=0)
-# lossf = nn.MSELoss()
-# z = model(means)
-# # print(z)
-# # print(origmeans)
-# # print(lossf(origmeans,z))
-    
-
-
