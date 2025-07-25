@@ -5,6 +5,8 @@ This repository contains the implementation of CTKH (Calibrated Top-k Histogram)
 <img src="utils/fig1.png" width=450>
 </p>
 
+(This repository is a fork of [https://github.com/joaomcm/Semantic-3D-Mapping-Uncertainty-Calibration/tree/main](https://github.com/joaomcm/Semantic-3D-Mapping-Uncertainty-Calibration/tree/main).)
+
 Refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
 ## Installation and setup
 1. Clone the repo
