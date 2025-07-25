@@ -1,14 +1,14 @@
 # Memory-Efficient Many-Class 3D Semantic Fusion
 This repository contains the implementation of CTKH (Calibrated Top-k Histogram) and EF (Encoded Fusion) semantic fusion techniques introduced in our paper [link to the paper?], IROS 2025. 
 
-Please refer to the instructions below to reproduce our experiments as well as run 3D semantic reconstructions on specific scenes from Scannet/Scannet++/BS3D datasets.
+Please refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
 ## Installation and setup
 1. Clone the repo
     ```bash
     git clone --recurse-submodules https://github.com/uiuc-iml/memory-efficient-3d-semantic-mapping.git
     cd memory-efficient-3d-semantic-mapping
     ```
-2. Setup environment
+2. Set up environment
     ```bash
     conda create -n semantic_mapping python=3.10.16
     conda activate semantic_mapping
@@ -25,10 +25,21 @@ Please refer to the instructions below to reproduce our experiments as well as r
 4. Download the dataset of your choice: [ScanNet v2](https://github.com/ScanNet/ScanNet), [ScanNet++](https://kaldir.vc.in.tum.de/scannetpp/), [BS3D](https://etsin.fairdata.fi/dataset/3836511a-29ba-4703-98b6-40e59bb5cd50)
 
 5. Download the pretrained weights for:
-   Scannet: Finetuned Segformer (https://uofi.app.box.com/s/lnuxvqh77tulivbew7c9y0m6jh5y23ti),
+   ScanNet: Fine-tuned Segformer (https://uofi.app.box.com/s/lnuxvqh77tulivbew7c9y0m6jh5y23ti),
     ESANet (https://uofi.app.box.com/s/hd3mlqcnwh9k1i3f5ffur5kcup32htby).
 
-   Scannet++: Finetuned Segformer TODO(vnadgir) Upload weights to box and add link here
+   ScanNet++: Fine-tuned Segformer TODO(vnadgir) Upload weights to box and add link here
    Place them in their respective folders in the /segmentation_model_checkpoints folder.
 
 ## Running experiments
+1. Specify the paths to dataset, results directory, etc in settings/directory_definitions.json.
+
+2. Run reconstructions for the semantic fusion techniques in settings/experiments_and_short_names.json:
+```bash
+cd calibration_experiments
+python perform_reconstruction.py --dataset "scannet++"
+```
+Use the argument "scannet" for ScanNet, "scannet++" for ScanNet++, and "bs3d" for BS3D.
+This script will also save per scene memory usage and update times plots in results_dir/{experiment_name}/visuals/.
+
+3.
