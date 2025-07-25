@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     sys.path.append(parent_dir)
 
-    from utils.segmentation_model_loader import FineTunedESANet, FineTunedTSegmenter, MaskformerSegmenter, FineMaskformerSegmenter
+    from utils.segmentation_model_loader import FineTunedESANet, FineTunedTSegmenter, Segformer150Segmenter, Segformer101Segmenter
     from calibration_experiments.experiment_setup import Experiment_Generator
     from utils.rendering_utils import get_camera_rays, render_depth_and_normals
     from utils.ScanNet_scene_definitions import get_filenames,get_fixed_train_and_val_splits,h5pyscenes, get_scannetpp_test_scenes, get_scannetpp_train_scenes
@@ -132,11 +132,13 @@ if __name__ == "__main__":
         f = h5py.File(dataset_filename, "a")
 
         if model_type == "Segformer":
-            model = MaskformerSegmenter()
+            model = FineTunedTSegmenter()
         elif model_type == "ESANet":
             model = FineTunedESANet(temperature=1)
-        elif model_type == "FineMaskformer":
-            model = FineMaskformerSegmenter()
+        elif model_type == "Segformer150":
+            model = Segformer150Segmenter()
+        elif model_type == "Segformer101":
+            model = Segformer101Segmenter()
 
         device = o3d.core.Device("CUDA:0")
 

@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
 from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, ProbabilisticAveragedEncodedReconstruction, topkhistMisraGries, topkhistKH
-from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, MaskformerSegmenter, FineMaskformerSegmenter
+from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, Segformer150Segmenter, Segformer101Segmenter, FineTunedESANet
 from utils.clipfeatures import ClipFeatureExtractor
 
 
@@ -99,13 +99,13 @@ class Experiment_Generator:
         return rec
 
     def get_model(self,segmentation,experiment,calibration):
-        assert segmentation in ['Segformer','ESANet', 'Maskformer', 'CLIP', 'FineMaskformer'],"Segmentation Model {} is not yet a valid choice"
+        assert segmentation in ['Segformer','ESANet', 'Segformer150', 'CLIP', 'Segformer101'],"Segmentation Model {} is not yet a valid choice"
         if(segmentation == 'Segformer'):
             model = FineTunedTSegmenter()
-        elif(segmentation == 'Maskformer'):
-            model = MaskformerSegmenter()
-        elif(segmentation == 'FineMaskformer'): # 100 classes
-            model = FineMaskformerSegmenter()
+        elif(segmentation == 'Segformer150'):
+            model = Segformer150Segmenter()
+        elif(segmentation == 'Segformer101'): # 100 classes
+            model = Segformer101Segmenter()
         elif(segmentation == 'ESANet'):
             model = FineTunedESANet()
         elif(segmentation == "CLIP"):

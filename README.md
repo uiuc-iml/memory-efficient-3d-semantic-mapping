@@ -24,12 +24,14 @@ Please refer to the instructions below to reproduce our experimental results as 
 
 4. Download the dataset of your choice: [ScanNet v2](https://github.com/ScanNet/ScanNet), [ScanNet++](https://kaldir.vc.in.tum.de/scannetpp/), [BS3D](https://etsin.fairdata.fi/dataset/3836511a-29ba-4703-98b6-40e59bb5cd50)
 
-5. Download the pretrained weights for:
+5. Download the pre-trained weights for:
    ScanNet: Fine-tuned Segformer (https://uofi.app.box.com/s/lnuxvqh77tulivbew7c9y0m6jh5y23ti),
     ESANet (https://uofi.app.box.com/s/hd3mlqcnwh9k1i3f5ffur5kcup32htby).
 
-   ScanNet++: Fine-tuned Segformer TODO(vnadgir) Upload weights to box and add link here
+   ScanNet++: Fine-tuned Segformer TODO(vnadgir) Upload weights to box and add link here.
    Place them in their respective folders in the /segmentation_model_checkpoints folder.
+
+6. To use Encoded Fusion (EF), download the weights and place them in the respective directory under calibration_experiments/EF_weights/: TODO(vnadgir) Upload weights to box and add link here.
 
 ## Running experiments
 1. Specify the paths to dataset, results directory, etc in settings/directory_definitions.json.

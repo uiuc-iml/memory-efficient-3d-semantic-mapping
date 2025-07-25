@@ -1,9 +1,8 @@
 {
-	"integration": "topk",
+	"integration": "Geometric Mean",
 	"calibration": "None",
 	"oracle": false,
 	"L": 0,
 	"epsilon": 1,
-	"segmentation": "Maskformer",
-    "k": 2
+	"segmentation": "Segformer150"
 }

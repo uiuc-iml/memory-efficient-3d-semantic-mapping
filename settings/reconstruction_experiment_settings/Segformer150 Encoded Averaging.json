@@ -4,6 +4,6 @@
 	"oracle": false,
 	"L": 0,
 	"epsilon": 1,
-	"segmentation": "Maskformer",
+	"segmentation": "Segformer150",
 	"k": 2
 }
