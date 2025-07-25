@@ -1,7 +1,9 @@
 # Memory-Efficient Many-Class 3D Semantic Fusion
 This repository contains the implementation of CTKH (Calibrated Top-k Histogram) and EF (Encoded Fusion) semantic fusion techniques introduced in our paper "Memory-Efficient Real Time Many-Class 3D Metric-Semantic Mapping", IROS 2025. 
 
-<img src="utils/fig1.png" width=500>
+<p align="center">
+<img src="utils/fig1.png" width=450>
+</p>
 
 Refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
 ## Installation and setup
