@@ -44,7 +44,7 @@ processes = 4
 faulthandler.enable()
 
 
-def reconstruct_scene(scene,experiment_name):
+def reconstruct_scene(scene,experiment_name,dataset):
 
 
     fnames = get_filenames()
@@ -64,7 +64,11 @@ def reconstruct_scene(scene,experiment_name):
             n_labels=None,integrate_color=False,miu = miu)
 
 
-    root_dir = fnames['ScanNetpp_root_dir']
+    if dataset == "scannet++":
+        root_dir = fnames['ScanNetpp_root_dir']
+    elif dataset == "scannet":
+        root_dir = fnames['ScanNet_root_dir']
+
     savedir = "{}/{}/".format(fnames['results_dir'],experiment_name)
     # savedir = '/scratch/bbuq/jcorreiamarques/3d_calibration/Results/{}/'.format(experiment_name)
     if(not os.path.exists(savedir)):
@@ -84,9 +88,11 @@ def reconstruct_scene(scene,experiment_name):
     try:
         device = o3d.core.Device('CUDA:0')
 
+        if dataset == "scannet++":
+            my_ds = ScanNetPPReader(root_dir, scene)
+        elif dataset == "scannet":
+            my_ds = scannet_scene_reader(root_dir, scene)
 
-
-        my_ds = ScanNetPPReader(root_dir, scene)
         total_len = len(my_ds)
 
         if(lim == -1):
@@ -138,15 +144,17 @@ def reconstruct_scene(scene,experiment_name):
 def main():
     import torch
     import multiprocessing
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset")
+    args = parser.parse_args()
+    if args.dataset == "scannet++":
+        test_scenes = get_scannetpp_test_scenes()
+    elif args.dataset == "scannet":
+        test_scenes = get_larger_test_and_validation_scenes()
+    
 
     torch.set_float32_matmul_precision('medium')
-    # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
-    # test_scenes = get_learned_calibration_validation_scenes()
-    # selected_scenes = sorted(test_scenes+val_scenes)
-    test_scenes = get_scannetpp_train_scenes()
     selected_scenes = sorted(test_scenes)
-    test_scenes1 = h5pyscenes()
-    selected_scenes1 = sorted(test_scenes1)
     p = multiprocessing.get_context('forkserver').Pool(processes = processes,maxtasksperchild = 1)
     res = []
     for a in tqdm(p.imap_unordered(partial(reconstruct_scene,experiment_name = 'reconstruction_gts'),selected_scenes,chunksize = 1), total= len(selected_scenes),position = 0,desc = 'tot_scenes'):

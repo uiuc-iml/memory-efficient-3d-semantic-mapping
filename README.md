@@ -1,7 +1,8 @@
 # Memory-Efficient Many-Class 3D Semantic Fusion
-This repository contains the implementation of CTKH (Calibrated Top-k Histogram) and EF (Encoded Fusion) semantic fusion techniques introduced in our paper [link to the paper?], IROS 2025. 
+This repository contains the implementation of CTKH (Calibrated Top-k Histogram) and EF (Encoded Fusion) semantic fusion techniques introduced in our paper "Memory-Efficient Real Time Many-Class 3D Metric-Semantic Mapping", IROS 2025. 
 
-Please refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
+![](utils/fig1.png)
+Refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
 ## Installation and setup
 1. Clone the repo
     ```bash
@@ -44,4 +45,16 @@ python perform_reconstruction.py --dataset "scannet++"
 Use the argument "scannet" for ScanNet, "scannet++" for ScanNet++, and "bs3d" for BS3D.
 This script will also save per scene memory usage and update times plots in results_dir/{experiment_name}/visuals/.
 
-3.
+3. Create the ground truth reconstructions:
+```bash
+cd ../dataset_creating_and_finetuning
+python create_reconstruction_gts.py --dataset "scannet++"
+```
+Note that only ScanNet and ScanNet++ have ground truth annotations.
+
+4. Run the evaluation script:
+```bash
+cd ../calibration_experiments
+python run_full_eval.py --dataset "scannet++"
+```
+This will output the results in {results_dir}/quant_eval.

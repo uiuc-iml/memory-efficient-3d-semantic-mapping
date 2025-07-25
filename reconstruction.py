@@ -534,6 +534,7 @@ class HistogramReconstruction(GroundTruthGenerator):
     
     def update_semantics(self, semantic_label, v_proj, u_proj, valid_voxel_indices, mask_inlier, weight, scene = None):
 
+
         semantic_label = np.argmax(semantic_label,axis = 2)
         
         # semantic_label = torch.nn.functional.one_hot(torch.from_numpy(semantic_label.astype(np.int64)),num_classes = self.n_labels).numpy().astype(np.float32)
@@ -552,9 +553,6 @@ class HistogramReconstruction(GroundTruthGenerator):
         semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()] = semantic[valid_voxel_indices,semantic_readings[mask_inlier].flatten()]+1
         o3d.core.cuda.synchronize()
 
-        # gpu_memory_usage.append(get_gpu_memory_usage())
-        # gpu_memory_usage_np = np.array(gpu_memory_usage)
-        # np.save(os.path.join(arr_dir, "gpu_memory_usage.npy"), gpu_memory_usage_np)
 
 
         o3d.core.cuda.release_cache()

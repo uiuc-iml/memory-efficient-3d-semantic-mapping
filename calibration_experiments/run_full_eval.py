@@ -10,6 +10,7 @@ import torch
 from torchmetrics.functional import jaccard_index
 from tqdm.notebook import tqdm
 import gc
+import argparse
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -37,8 +38,11 @@ no_void =  False
 fnames = get_filenames()
 
 results_dir = fnames['results_dir']
-results_dir = '/work/hdd/bebg/results/scannetpp'
-num_classes = 101
+if args.dataset == "scannet++":
+    num_classes = 101
+elif args.dataset == "scannet":
+    num_classes = 21
+
 def get_experiments_and_short_names():
     a = json.load(open('../settings/experiments_and_short_names.json','r'))
     experiments = a['experiments']
@@ -52,10 +56,15 @@ def compute_mIoUs():
     
     # val_scenes,test_scenes = get_larger_test_and_validation_scenes()
     # test_scenes = get_larger_test_and_validation_scenes()
-    test_scenes = get_scannetpp_test_scenes()
+    if args.dataset == "scannet++":
+        test_scenes = get_scannetpp_test_scenes()
+    elif args.dataset == "scannet":
+        test_scenes = get_larger_test_and_validation_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+    if args.dataset == "scannet++":
+        gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+
     pcds_template = '{}/{}/{}/*.pcd'
     labels_template = '{}/{}/{}/labels*.p'
     per_exp_IoUs = {}
@@ -449,6 +458,9 @@ from multiprocessing import Process
 # p1.join()
 # p2.join()
 # p3.join()
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", type=str, required=True, help="Dataset")
+args = parser.parse_args()
 compute_mIoUs()
 compute_mECEs()
 compute_brier_scores()
