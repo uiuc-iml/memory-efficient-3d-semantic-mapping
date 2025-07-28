@@ -5,6 +5,7 @@ This repository contains the implementation of CTKH (Calibrated Top-k Histogram)
 <img src="utils/fig1.png" width=450>
 </p>
 
+You can find CTKH and EF implementations on lines 610 and 1266 respectively.
 (This repository is a fork of [https://github.com/joaomcm/Semantic-3D-Mapping-Uncertainty-Calibration/tree/main](https://github.com/joaomcm/Semantic-3D-Mapping-Uncertainty-Calibration/tree/main).)
 
 Refer to the instructions below to reproduce our experimental results as well as run 3D semantic reconstructions on specific scenes from ScanNet/ScanNet++/BS3D datasets.
@@ -30,15 +31,22 @@ Refer to the instructions below to reproduce our experimental results as well as
 
 4. Download the dataset of your choice: [ScanNet v2](https://github.com/ScanNet/ScanNet), [ScanNet++](https://kaldir.vc.in.tum.de/scannetpp/), [BS3D](https://etsin.fairdata.fi/dataset/3836511a-29ba-4703-98b6-40e59bb5cd50)
 
-5. Download the pre-trained weights for:
+5. Download the pre-trained weights and place them in their respective folders in the /segmentation_model_checkpoints folder.
+
    ScanNet: Fine-tuned Segformer (https://uofi.app.box.com/s/lnuxvqh77tulivbew7c9y0m6jh5y23ti),
     ESANet (https://uofi.app.box.com/s/hd3mlqcnwh9k1i3f5ffur5kcup32htby).
 
-   ScanNet++: Fine-tuned Segformer TODO(vnadgir) Upload weights to box and add link here.
-   Place them in their respective folders in the /segmentation_model_checkpoints folder.
+   ScanNet++: Fine-tuned Segformer ([Download](https://app.box.com/s/njxthbqf76s5wgv314zsovrhi6lce627)) 
+   
 
-6. To use Encoded Fusion (EF), download the weights and place them in the respective directory under calibration_experiments/EF_weights/: TODO(vnadgir) Upload weights to box and add link here.
+6. We provide weights for the encoder-decoder architecture used in EF for encoding dimensions 2,4, and 8 for the below listed segmentation models. To use Encoded Fusion (EF), download the weights and place them in the respective directory under calibration_experiments/EF_weights/: 
 
+| Model | num_classes | encoding dim = 2 | encoding dim = 4 | encoding dim = 8 |
+|-------|-------------|------------------|------------------|------------------|
+| ESANet (ScanNet) | 21 | [Download](https://app.box.com/s/66nilpl5utwaobep51jo4wml4d25wymu) | [Download](https://app.box.com/s/h4pp4gt39cj6ubamoq86ktcvwnyc9oh3) | [Download](https://app.box.com/s/d2jvevniulb2n6ofu7m3hutgemhfufrn) |
+| Segformer (ScanNet) | 21 | [Download](https://app.box.com/s/mtjkld3wpo0sc2z5eo509zvvc94du2sy) | [Download](https://app.box.com/s/6ild1xo83psfnrhwapeew509oos870ji) | [Download](https://app.box.com/s/hljdtjl3o7df24w4imlx1jhvgur3ihy5) |
+| Segformer (ScanNet++) | 101 | [Download](https://app.box.com/s/6lhsklh49f26sg561jqvjn24raugzc0k) | [Download](https://app.box.com/s/umjus3fzjfr5keouemhsaciee4v1d1z6) | [Download](https://app.box.com/s/re5tcq9zgd5sful07u8v1g1v4blqkwdz) |
+| Segformer (BS3D) | 150 | [Download](https://app.box.com/s/mevqrsm4j5bch61bdm3rdq1vzr1rdbze) | [Download](https://app.box.com/s/ygre2qustgompxa7hnyecggpe7pjhrim) | [Download](https://app.box.com/s/5mkqeh3a5sdlbivlm9i6vj2d6w4vr56a) |
 ## Running experiments
 1. Specify the paths to dataset, results directory, etc in settings/directory_definitions.json.
 
@@ -70,6 +78,7 @@ This will output the results in {results_dir}/quant_eval.
 python perform_reconstruction.py --dataset "bs3d" --scene "dining" --integration "CTKH" --k 4
 ```
 
-Note: `--integration` must be one of `["CTKH", "Naive Averaging", "Naive Bayesian", "Histogram", "EF"]`k` is valid for CTKH and EF only.
+Note: `--integration` must be one of `["CTKH", "Naive Averaging", "Naive Bayesian", "Histogram", "EF"]`. `k` is valid for CTKH and EF only. 
 This will write the point cloud, label file and the plots for VRAM usage and update times in the results_dir you specify in settings/directory_definitions.json.
+
 
