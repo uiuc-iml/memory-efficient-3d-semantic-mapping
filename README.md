@@ -72,7 +72,7 @@ python run_full_eval_scannet.py # or python run_full_eval_scannetpp.py
 ```
 This will output the results in {results_dir}/quant_eval.
 
-## Running semantic reconstructions for specific scenes and semantic fusion
+## Running semantic reconstructions for specific scenes and semantic fusion technique
 1. Example
 ```bash
 python perform_reconstruction.py --dataset "bs3d" --scene "dining" --integration "CTKH" --k 4
