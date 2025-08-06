@@ -67,7 +67,7 @@ def reading_func(scene):
     return []
 
 if __name__ == '__main__':
-    train_splits = pd.read_csv('../settings/train_split.txt',header= None)
+    train_splits = pd.read_csv('../settings/scannet_train_split.txt',header= None)
     train_splits.columns = ['scenes']
     selected_scenes = sorted(train_splits.scenes.tolist())
     Parallel(n_jobs = 8,backend = 'sequential',verbose = 100)(delayed(reading_func)(scene) for scene in selected_scenes)

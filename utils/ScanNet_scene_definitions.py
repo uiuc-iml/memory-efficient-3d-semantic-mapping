@@ -1,15 +1,21 @@
 import pandas as pd
 import numpy as np
 import json
+from pathlib import Path
 
 
 SEED = 0
 
+module_dir = Path(__file__).resolve().parent
+project_root = module_dir.parent
+DATA_DIR = project_root / 'data'
+SCANNETPP_SPLITS_DIR = DATA_DIR / 'scannetpp_splits'
+
 
 def get_larger_test_and_validation_scenes():
     
-    # df = pd.read_csv('./scenes_and_contents_20_classes.csv')
-    df = pd.read_csv('scenes_and_contents_20_classes.csv')
+    # df = pd.read_csv(DATA_DIR / 'scenes_and_contents_20_classes.csv')
+    df = pd.read_csv(DATA_DIR / 'scenes_and_contents_20_classes.csv')
     np.random.seed(0)
     series = df.scene
     scenes = sorted(np.random.choice(sorted(series.to_numpy().tolist()),size = 100,replace = False))    
@@ -19,7 +25,7 @@ def get_larger_test_and_validation_scenes():
     return scenes,new_test_scenes
 
 def get_scannetpp_test_scenes():
-    file_path = 'newtest.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'newtest.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
@@ -28,7 +34,7 @@ def get_scannetpp_test_scenes():
     return sorted(scenes)
 
 def get_scannetpp_val_scenes():
-    file_path = 'nvs_sem_val.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'newval.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
@@ -37,7 +43,7 @@ def get_scannetpp_val_scenes():
 
     
 def get_scannetpp_train_scenes():
-    file_path = 'newtrain.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'newtrain.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     return sorted(scenes)
@@ -86,10 +92,6 @@ def get_classes():
     return classes
 
 def get_scannetpp_classes():
-    # classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
-    #     'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
-    #     'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
-    #     'radiator', 'glass', 'clock', 'flag']
     classes = [
     "wall", "ceiling", "floor", "table", "door", "ceiling lamp", "cabinet", "blinds", "curtain", "chair",
     "storage cabinet", "office chair", "bookshelf", "whiteboard", "window", "box", "window frame", "monitor",
@@ -109,7 +111,7 @@ def get_scannetpp_classes():
 
 
 def derive_learned_splits():
-    df = pd.read_csv('./scenes_and_contents_20_classes.csv', index_col = 0)
+    df = pd.read_csv(DATA_DIR / 'scenes_and_contents_20_classes.csv', index_col = 0)
     np.random.seed(0)
     series = df.scene
     scenes = sorted(np.random.choice(sorted(series.to_numpy().tolist()),size = 100,replace = False))    
@@ -165,7 +167,7 @@ def get_fixed_train_and_val_splits():
 
 
 def get_ScanNet_validation_scenes():
-    df = pd.read_csv('./scenes_and_contents_20_classes.csv')
+    df = pd.read_csv(DATA_DIR / 'scenes_and_contents_20_classes.csv')
     series = sorted(df.scene.tolist())
     return series
 

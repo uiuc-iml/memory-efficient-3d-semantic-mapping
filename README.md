@@ -31,15 +31,17 @@ Refer to the instructions below to reproduce our experimental results as well as
 
 4. Download the dataset of your choice: [ScanNet v2](https://github.com/ScanNet/ScanNet), [ScanNet++](https://kaldir.vc.in.tum.de/scannetpp/), [BS3D](https://etsin.fairdata.fi/dataset/3836511a-29ba-4703-98b6-40e59bb5cd50)
 
-5. Download the pre-trained weights and place them in their respective folders in the /segmentation_model_checkpoints folder.
+5. Download the pre-trained weights for segmentation models and place them in their respective folders in the /segmentation_model_checkpoints folder.
 
    ScanNet: Fine-tuned Segformer (https://uofi.app.box.com/s/lnuxvqh77tulivbew7c9y0m6jh5y23ti),
     ESANet (https://uofi.app.box.com/s/hd3mlqcnwh9k1i3f5ffur5kcup32htby).
 
    ScanNet++: Fine-tuned Segformer ([Download](https://app.box.com/s/njxthbqf76s5wgv314zsovrhi6lce627)) 
+
+   For BS3D, we use the 150 class off-the-shelf segformer-b4-finetuned-ade-512-512 model.
    
 
-6. We provide weights for the encoder-decoder architecture used in EF for encoding dimensions 2,4, and 8 for the below listed segmentation models. To use Encoded Fusion (EF), download the weights and place them in the respective directory under calibration_experiments/EF_weights/: 
+6. We provide weights for the encoder-decoder architecture used in EF for encoding dimensions 2,4, and 8 for the below listed segmentation models. To use Encoded Fusion (EF), download the weights and place them in the respective directory under [calibration_experiments/EF_weights/](calibration_experiments/EF_weights/README.md): 
 
 | Model | num_classes | encoding dim = 2 | encoding dim = 4 | encoding dim = 8 |
 |-------|-------------|------------------|------------------|------------------|

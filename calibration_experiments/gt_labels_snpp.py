@@ -13,6 +13,7 @@ import gc
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
+data_dir = os.path.join(parent_dir, 'data')
 
 from utils.my_calibration import (
     BrierScore3D,
@@ -39,7 +40,10 @@ results_dir = fnames['results_dir']
 test_scenes = get_scannetpp_test_scenes()
 
 selected_scenes = test_scenes
-gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'class_equivalence_revised.xlsx')
+gt_getter = scanentpp_gt_getter(
+    fnames['ScanNetpp_root_dir'],
+    os.path.join(data_dir, 'class_equivalence_revised.xlsx')
+)
 import pandas as pd
 import numpy as np
 from tqdm.notebook import tqdm
@@ -61,5 +65,5 @@ for scene in tqdm(selected_scenes):
 scene_names = [f"{selected_scenes[i]}" for i in range(len(selected_scenes))]
 df = pd.DataFrame(scene_data, index=scene_names, columns=range(151))
 
-output_file = "scene_labels_grid.xlsx"
+output_file = os.path.join(data_dir, "scene_labels_grid.xlsx")
 df.to_excel(output_file)

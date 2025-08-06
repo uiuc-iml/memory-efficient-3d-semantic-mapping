@@ -242,35 +242,6 @@ def compute_mECEs():
     df.to_excel('{}/quant_eval/ECEs by class and experiment_alt_finetuned.xlsx'.format(results_dir),index = False)
     
     
-    
-    # import seaborn as sns
-    # sns.set_theme()
-    # for i,c in tqdm(enumerate(classes[:21])):
-    #     fig,axis = plt.subplots(1,len(experiments))
-
-    #     for experiment,short_name in tqdm(zip(experiments,short_names)):
-    #         ax = axis[experiments.index(experiment)]
-    #         cc = all_cals[experiment].cals[i]
-    #         cal,conf,lims = cc.return_calibration_results()
-    #         lims = lims-0.05
-    #         cal = cc.correct_bin_members/cc.total_bin_members
-    #         cal = np.nan_to_num(cal,0)
-    # #         fig, ax = plt.subplots()
-    #         fig.set_size_inches(len(experiment)*8,8)
-    #         p1 = ax.bar(x= lims, height = cal,  width = 0.8*(lims[1]-lims[0]),color = 'b',alpha = 0.5)
-    #         ax.bar(x= lims, height = conf, width = 0.8*(lims[1]-lims[0]),color = 'r',alpha = 0.2)
-    #         ax.plot(np.arange(11)/10,np.arange(11)/10)
-    #         membership = (cc.total_bin_members/cc.total_bin_members.sum()*100)
-    #         membership = np.round(membership,decimals = 1)
-    #         membership = ['(' +str(i) + '%)' for i in membership]
-
-    #         # membership = eval(np.array_str(membership, precision=2, suppress_small=True))
-    #         ax.bar_label(p1, labels = membership,label_type='edge')
-    #         ax.set_title('{} - {} - ECE = {:.3f}'.format(short_name,c,cc.get_ECE()))
-    #         ax.set_xlabel('Upper Confidence')
-    #         ax.set_ylabel('Empirical Accuracy within bin (total pixel %)')
-    #     plt.savefig('{}/mECE Analysis/plots/Segformer3/Rel_diagrams_by_experiment_{}.png'.format(results_dir,c),bbox_inches = 'tight')
-    #     plt.show()
 
 
 

@@ -13,6 +13,7 @@ import gc
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
+data_dir = os.path.join(parent_dir, 'data')
 
 from utils.my_calibration import (
     BrierScore3D,
@@ -53,7 +54,7 @@ def compute_mIoUs():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], os.path.join(data_dir, 'mapping_to_top_100.xlsx'))
 
     pcds_template = '{}/{}/{}/*.pcd'
     labels_template = '{}/{}/{}/labels*.p'
@@ -194,7 +195,7 @@ def compute_mECEs():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], os.path.join(data_dir, 'mapping_to_top_100.xlsx'))
 
 
     ECE_by_experiment = []
@@ -262,12 +263,6 @@ def compute_mECEs():
     mtx = np.array(ECE_by_experiment)
 
     df = pd.DataFrame(mtx)
-    # classes = ['null','wall','floor','cabinet','bed','chair','sofa','table','door','window','bookshelf','picture',
-    #            'counter','desk','curtain','refrigerator','shower curtain','toilet','sink','bathtub','otherfurniture','aggregate','TL-ECE']
-    # classes = ['wall', 'building', 'sky', 'floor', 'tree', 'ceiling', 'road', 'bed', 'windowpane', 'grass', 'cabinet', 'sidewalk', 'person', 'earth', 'door', 'table', 'mountain', 'plant', 'curtain', 'chair', 'car', 'water', 'painting', 'sofa', 'shelf', 'house', 'sea', 'mirror', 'rug', 'field', 'armchair', 'seat', 'fence', 'desk', 'rock', 'wardrobe', 'lamp', 'bathtub', 'railing', 'cushion', 'base', 'box', 'column', 'signboard', 'chest of drawers', 'counter', 'sand', 'sink', 'skyscraper', 'fireplace', 'refrigerator', 
-    #     'grandstand', 'path', 'stairs', 'runway', 'case', 'pool table', 'pillow', 'screen door', 'stairway', 'river', 'bridge', 'bookcase', 'blind', 'coffee table', 'toilet', 'flower', 'book', 'hill', 'bench', 'countertop', 'stove', 'palm', 'kitchen island', 'computer', 'swivel chair', 'boat', 'bar', 'arcade machine', 'hovel', 'bus', 'towel', 'light', 'truck', 'tower', 'chandelier', 'awning', 'streetlight', 'booth', 'television receiver', 'airplane', 'dirt track', 'apparel', 'pole', 'land', 'bannister', 'escalator', 
-    #     'ottoman', 'bottle', 'buffet', 'poster', 'stage', 'van', 'ship', 'fountain', 'conveyer belt', 'canopy', 'washer', 'plaything', 'swimming pool', 'stool', 'barrel', 'basket', 'waterfall', 'tent', 'bag', 'minibike', 'cradle', 'oven', 'ball', 'food', 'step', 'tank', 'trade name', 'microwave', 'pot', 'animal', 'bicycle', 'lake', 'dishwasher', 'screen', 'blanket', 'sculpture', 'hood', 'sconce', 'vase', 'traffic light', 'tray', 'ashcan', 'fan', 'pier', 'crt screen', 'plate', 'monitor', 'bulletin board', 'shower', 
-    #     'radiator', 'glass', 'clock', 'flag', 'aggregate', 'TL-ECE']
     classes = [
     "wall", "ceiling", "floor", "table", "door", "ceiling lamp", "cabinet", "blinds", "curtain", "chair",
     "storage cabinet", "office chair", "bookshelf", "whiteboard", "window", "box", "window frame", "monitor",
@@ -309,7 +304,7 @@ def compute_brier_scores():
     test_scenes = get_scannetpp_test_scenes()
 
     selected_scenes = test_scenes
-    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], 'mapping_to_top_100.xlsx')
+    gt_getter = scanentpp_gt_getter(fnames['ScanNetpp_root_dir'], os.path.join(data_dir, 'mapping_to_top_100.xlsx'))
 
     experiments,short_names = get_experiments_and_short_names()
     metric = BrierScore3D

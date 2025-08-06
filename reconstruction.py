@@ -686,15 +686,6 @@ class topkhist(Reconstruction):
                 topk[voxels_to_remove, label_cols] = -1
                 topk[voxels_to_remove, count_cols] = 0
 
-        # No need to sort (remove) 
-        # counts = topk[valid_voxel_indices_torch, 1:2 * k:2]
-        # labels = topk[valid_voxel_indices_torch, 0:2 * k:2]
-        # sorted_indices = torch.argsort(-counts, dim=1)
-        # sorted_counts = counts.gather(1, sorted_indices)
-        # sorted_labels = labels.gather(1, sorted_indices)
-        # topk[valid_voxel_indices_torch, 0:2 * k:2] = sorted_labels
-        # topk[valid_voxel_indices_torch, 1:2 * k:2] = sorted_counts
-
         o3d.core.cuda.synchronize()
         o3d.core.cuda.release_cache()
         torch.cuda.synchronize()

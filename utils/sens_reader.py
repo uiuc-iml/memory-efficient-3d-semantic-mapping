@@ -23,10 +23,6 @@ from utils.colmap import read_model
 import re
 
 
-
-
-
-
 def unzip(zip_path, zip_type,scene_name):
     assert zip_type in ["instance-filt", "label-filt"]
     target_dir = f'/tmp/{zip_type}/{scene_name}'
@@ -39,38 +35,6 @@ def unzip(zip_path, zip_type,scene_name):
             zip_ref.extractall(target_dir)
     return os.path.join(target_dir, zip_type)
 
-
-# class ScanNetPPReader(Dataset):
-#     def __init__(self,root_dir,scene_name):
-#         self.scene = scene_name
-#         self.root_dir = root_dir
-#         self.parent_dir = root_dir+'/data/{}/iphone'.format(scene_name)
-#         self.depth_image_files = sorted(glob(self.parent_dir+'/depth/*.png'))
-#         self.rgb_image_files =  sorted(glob(self.parent_dir+'/rgb/*.jpg'))
-#         with open(self.parent_dir + '/pose_intrinsic_imu.json','r') as f:
-#             self.poses_dict = json.load(f)
-#         self.poses_key = list(self.poses_dict.keys())
-#         self.size = len(self.depth_image_files)
-        
-#     def __getitem__(self,key):
-#         depth_dir = self.depth_image_files[key]
-#         rgb_dir = self.rgb_image_files[key]
-#         pose_key = self.poses_key[key]
-#         depth = cv2.imread(depth_dir,cv2.IMREAD_UNCHANGED)
-#         rgb = cv2.imread(rgb_dir,cv2.IMREAD_UNCHANGED)
-#         rgb = cv2.resize(rgb,(0,0),fx = 1/7.5,fy = 1/7.5)
-#         aligned_pose = np.array(self.poses_dict[pose_key]['aligned_pose'])
-#         intrinsic = np.array(self.poses_dict[pose_key]['intrinsic'])
-#         intrinsic[:2,:3] = intrinsic[:2,:3]/7.5
-#         return {
-#             'color': rgb,
-#             'depth': depth,
-#             'pose': aligned_pose,
-#             'intrinsics_depth':intrinsic
-#         }
-
-#     def __len__(self):
-#         return self.size
 
 class ScanNetPPReader(Dataset):
     def __init__(self,root_dir,scene_name):
@@ -153,10 +117,10 @@ class ScanNetPPReader(Dataset):
 
 class BS3D_reader(Dataset):
     def __init__(self,root_dir):
-        self.depth_dir = root_dir + '/campus_depth_cam_depth_render/depth_render/'
-        self.color_dir = root_dir + '/campus_depth_cam_color/color/'
-        self.poses_dir = root_dir + '/campus_depth_cam_poses/poses.txt'
-        self.calibration_dir = root_dir + '/campus_depth_cam_calibration/calibration.yaml'
+        self.depth_dir = root_dir + '/depth_cam_depth_render/depth_render/'
+        self.color_dir = root_dir + '/depth_cam_color/color/'
+        self.poses_dir = root_dir + '/depth_cam_poses/poses.txt'
+        self.calibration_dir = root_dir + '/depth_cam_calibration/calibration.yaml'
         with open(self.calibration_dir,'r') as stream:
             tmp = yaml.safe_load(stream)
             if tmp:

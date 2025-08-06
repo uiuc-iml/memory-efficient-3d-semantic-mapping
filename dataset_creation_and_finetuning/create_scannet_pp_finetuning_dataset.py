@@ -1,9 +1,3 @@
-# for param in model.parameters():
-#     param.requires_grad = False
-# decoder_head = model.decode_head
-# decoder_head.classifier = nn.Conv2d(768,21,kernel_size=(1, 1), stride=(1, 1))
-# for param in decoder_head.parameters():
-#     param.requires_grad = True
 
 from glob import glob
 import pandas as pd 
@@ -14,25 +8,16 @@ import numpy as np
 import pickle
 from datasets import IterableDataset
 from tqdm import tqdm
+from pathlib import Path
 
-# frames = pd.Series(sorted(glob('/home/motion/data/scannet_pp/data/**/gt_semantics/*.png',recursive = True)))
-# frame_names = frames.str.split('/',expand = True).iloc[:,-1].str.split('.',expand = True).iloc[:,0]
-# rgb_frames = frames.str.rsplit('/',expand = True,n = 2).iloc[:,0] + '/rgb/'+frame_names+'.jpg'
+# Path setup
+module_dir = Path(__file__).resolve().parent
+project_root = module_dir.parent
+SCANNETPP_SPLITS_DIR = project_root / 'data' / 'scannetpp_splits'
 
-# img1 = '/home/motion/data/scannet_pp/data/1a8e0d78c0/iphone/gt_semantics/frame_000030.png'
-# tmp = cv2.imread(frames[0],cv2.IMREAD_UNCHANGED)
-# tmp2 = cv2.imread(rgb_frames[0])
-# plt.figure(1)
-# plt.imshow(tmp)
-# plt.figure(2)
-# plt.imshow(tmp2)
-# plt.show()
-
-
-
-original_train =  pd.read_csv('./nvs_sem_train.txt',header = None).iloc[:,0]
-val_scenes = pd.read_csv('./newval.txt',header = None).iloc[:,0]
-test_scenes =  pd.read_csv('./newtest.txt',header = None).iloc[:,0]
+original_train =  pd.read_csv(module_dir / 'nvs_sem_train.txt', header=None).iloc[:,0]
+val_scenes = pd.read_csv(SCANNETPP_SPLITS_DIR / 'newval.txt', header=None).iloc[:,0]
+test_scenes =  pd.read_csv(SCANNETPP_SPLITS_DIR / 'newtest.txt', header=None).iloc[:,0]
 train_scenes = original_train.loc[np.logical_and(np.logical_not(original_train.isin(val_scenes)),np.logical_not(original_train.isin(test_scenes)))]
 print(train_scenes.shape[0],original_train.shape[0])
 # def data_generator():

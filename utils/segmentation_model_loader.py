@@ -12,11 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-# from src.build_model import build_model
-# from src.models.model import Upsample
-# from src.prepare_data import prepare_data
+from src.build_model import build_model
+from src.models.model import Upsample
+from src.prepare_data import prepare_data
 from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation, MaskFormerFeatureExtractor, MaskFormerForInstanceSegmentation
-# import nvidia_smi
+import nvidia_smi
 import os
 
 
@@ -124,11 +124,6 @@ class ESANetClassifier:
             else:
                 pred = self.softmax(pred/self.temperature)
 
-            # pred = torch.tensordot(pred.cpu(),self.cm,dims = ([0],[0]))
-            # pred = pred.cpu().squeeze().permute(1,2,0).detach().numpy()
-            # self.pred_dist[:,:,:] = 0
-            # for idx,new_class in enumerate(self.class_mapping):
-            #     self.pred_dist[:,:,new_class] += pred[:,:,idx]
         return pred.squeeze().detach().permute((1,2,0)).contiguous().cpu().numpy()
 
     def get_raw_logits(self,img_rgb,depth,x = None,y = None,temperature = None):
@@ -157,10 +152,6 @@ class ESANetClassifier:
                 pred = F.interpolate(pred, (pred.shape[2],pred.shape[3]),mode='nearest')
             else:
                 pred = F.interpolate(pred, (x,y),mode='nearest')
-            # pred = pred.cpu().squeeze().permute(1,2,0).detach().numpy()
-            # self.pred_dist[:,:,:] = 0
-            # for idx,new_class in enumerate(self.class_mapping):
-            #     self.pred_dist[:,:,new_class] += pred[:,:,idx]
         return pred.detach().squeeze().permute((1,2,0)).cpu().numpy()
 
     def get_logits_and_preds(self,img_rgb,depth,x = None,y = None,temperature = None):
@@ -192,10 +183,6 @@ class ESANetClassifier:
                 pred = F.interpolate(pred, (x,y),mode='nearest')
 
             pred_classes = torch.argmax(pred, dim=1).detach().squeeze().cpu().numpy()
-        # pred = pred.cpu().squeeze().permute(1,2,0).detach().numpy()
-        # self.pred_dist[:,:,:] = 0
-        # for idx,new_class in enumerate(self.class_mapping):
-        #     self.pred_dist[:,:,new_class] += pred[:,:,idx]
         return pred.detach().cpu().numpy().squeeze(),pred_classes
 
 class FineTunedESANet(ESANetClassifier):
