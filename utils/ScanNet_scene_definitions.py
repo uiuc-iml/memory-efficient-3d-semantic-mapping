@@ -25,7 +25,7 @@ def get_larger_test_and_validation_scenes():
     return scenes,new_test_scenes
 
 def get_scannetpp_test_scenes():
-    file_path = SCANNETPP_SPLITS_DIR / 'newtest.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'scannetpp_test_scenes.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
@@ -34,7 +34,7 @@ def get_scannetpp_test_scenes():
     return sorted(scenes)
 
 def get_scannetpp_val_scenes():
-    file_path = SCANNETPP_SPLITS_DIR / 'newval.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'scannetpp_val_scenes.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
@@ -43,7 +43,7 @@ def get_scannetpp_val_scenes():
 
     
 def get_scannetpp_train_scenes():
-    file_path = SCANNETPP_SPLITS_DIR / 'newtrain.txt'
+    file_path = SCANNETPP_SPLITS_DIR / 'scannetpp_train_scenes.txt'
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     return sorted(scenes)

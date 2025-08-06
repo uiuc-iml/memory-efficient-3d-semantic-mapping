@@ -16,8 +16,8 @@ project_root = module_dir.parent
 SCANNETPP_SPLITS_DIR = project_root / 'data' / 'scannetpp_splits'
 
 original_train =  pd.read_csv(module_dir / 'nvs_sem_train.txt', header=None).iloc[:,0]
-val_scenes = pd.read_csv(SCANNETPP_SPLITS_DIR / 'newval.txt', header=None).iloc[:,0]
-test_scenes =  pd.read_csv(SCANNETPP_SPLITS_DIR / 'newtest.txt', header=None).iloc[:,0]
+val_scenes = pd.read_csv(SCANNETPP_SPLITS_DIR / 'scannetpp_val_scenes.txt', header=None).iloc[:,0]
+test_scenes =  pd.read_csv(SCANNETPP_SPLITS_DIR / 'scannetpp_test_scenes.txt', header=None).iloc[:,0]
 train_scenes = original_train.loc[np.logical_and(np.logical_not(original_train.isin(val_scenes)),np.logical_not(original_train.isin(test_scenes)))]
 print(train_scenes.shape[0],original_train.shape[0])
 # def data_generator():
