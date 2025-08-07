@@ -14,7 +14,6 @@ sys.path.append(parent_dir)
 from reconstruction import Reconstruction,LearnedGeneralizedIntegration
 from reconstruction import ProbabilisticAveragedReconstruction,HistogramReconstruction,GeometricBayes,GeneralizedIntegration, HistogramReconstruction16, topkhist, AveragedEncodedReconstruction, topkhistMisraGries, topkhistKH
 from utils.segmentation_model_loader import TSegmenter,FineTunedTSegmenter, Segformer150Segmenter, Segformer101Segmenter, FineTunedESANet
-from utils.clipfeatures import ClipFeatureExtractor
 
 
 class Experiment_Generator:
@@ -99,7 +98,7 @@ class Experiment_Generator:
         return rec
 
     def get_model(self,segmentation,experiment,calibration):
-        assert segmentation in ['Segformer','ESANet', 'Segformer150', 'CLIP', 'Segformer101'],"Segmentation Model {} is not yet a valid choice"
+        assert segmentation in ['Segformer','ESANet', 'Segformer150', 'Segformer101'],"Segmentation Model {} is not yet a valid choice"
         if(segmentation == 'Segformer'):
             model = FineTunedTSegmenter()
         elif(segmentation == 'Segformer150'):
@@ -108,8 +107,6 @@ class Experiment_Generator:
             model = Segformer101Segmenter()
         elif(segmentation == 'ESANet'):
             model = FineTunedESANet()
-        elif(segmentation == "CLIP"):
-            model = ClipFeatureExtractor()
         else:
             raise ValueError("Selected model {} is not a valid selection".format(segmentation))
         if((calibration != 'None') and (calibration != 'Learned')):

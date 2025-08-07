@@ -166,8 +166,8 @@ def compute_mECEs():
     ECE_by_experiment = []
 
     for g,experiment in enumerate(experiments):
-        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void)
-        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void)
+        mECE_cal = mECE_Calibration_calc_3D(no_void = no_void, n_classes = 21)
+        TL_ECE_cal = mECE_Calibration_calc_3D_fix(no_void = no_void, n_classes = 21)
         pcds_template = '{}/{}/{}/*.pcd'
         labels_template = '{}/{}/{}/labels*.p'
         gts = []
@@ -257,7 +257,7 @@ def compute_brier_scores():
     per_scene_mECEs = []
     for g,experiment in enumerate(experiments):
         multiply = False
-        mECE_cal = metric(no_void = no_void)
+        mECE_cal = metric(no_void = no_void, n_classes = 21)
 
         # cc_3d = Calibration_calc_3D(no_void = True)
         pcds_template = '{}/{}/{}/*.pcd'
