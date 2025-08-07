@@ -3,7 +3,7 @@
 This directory stores the EF (Encoded Fusion) weights for the different segmentation models and encoding dimensions.
 
 
-- **Segformer_21**: 21 classes (for ScanNet dataset)
+- **Segformer_21** and **ESANet_21**: 21 classes (for ScanNet dataset)
 - **Segformer_101**: 101 classes (for ScanNet++ dataset) 
 - **Segformer_150**: 150 classes (for BS3D dataset)
 
