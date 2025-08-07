@@ -155,3 +155,4 @@ wrapt==1.17.2
 xxhash==3.3.0
 yarl==1.9.2
 zipp==3.15.0
+nvidia-ml-py3

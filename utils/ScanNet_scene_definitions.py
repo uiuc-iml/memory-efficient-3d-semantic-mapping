@@ -29,7 +29,7 @@ def get_scannetpp_test_scenes():
     with open(file_path, 'r') as file:
         scenes = [line.strip() for line in file]
     
-    print(sorted(scenes[0:10]))
+    # print(sorted(scenes[0:10]))
     # return sorted(scenes[0:2])
     return sorted(scenes)
 
