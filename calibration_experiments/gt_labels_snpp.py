@@ -42,7 +42,7 @@ test_scenes = get_scannetpp_test_scenes()
 selected_scenes = test_scenes
 gt_getter = scanentpp_gt_getter(
     fnames['ScanNetpp_root_dir'],
-    os.path.join(data_dir, 'class_equivalence_revised.xlsx')
+    os.path.join(data_dir, 'scannetpp_class_equivalence_revised.xlsx')
 )
 import pandas as pd
 import numpy as np

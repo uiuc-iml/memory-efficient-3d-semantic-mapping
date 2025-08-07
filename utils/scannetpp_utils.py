@@ -37,7 +37,7 @@ class scanentpp_gt_getter:
 if __name__=='__main__':
     
     root_dir = '/home/motion/extra_storage/scannet_pp'
-    class_equivalence_dir = 'class_equivalence_revised.xlsx'
+    class_equivalence_dir = 'scannetpp_class_equivalence_revised.xlsx'
     gt_getter = scanentpp_gt_getter(root_dir = root_dir,class_equivalence_dir = class_equivalence_dir)
 
     pcd,gt_labels = gt_getter.get_gt_point_cloud_and_labels('0a5c013435')
