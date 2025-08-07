@@ -7,6 +7,7 @@ This directory stores the EF (Encoded Fusion) weights for the different segmenta
 - **Segformer_101**: 101 classes (for ScanNet++ dataset) 
 - **Segformer_150**: 150 classes (for BS3D dataset)
 
+Code assumes the following diectory structure when reading weights, so make sure to place the weights correctly after downloading them.
 ## Directory Structure
 
 ```
